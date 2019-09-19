@@ -2,6 +2,7 @@ import { Database } from 'sqlite3'
 import { EventEmitter } from 'events';
 import * as vscode from 'vscode';
 import * as path from 'path'
+import * as socket_io from 'socket.io-client'
 
 export interface KratosBreakpoint {
 	id: number;
@@ -28,6 +29,8 @@ export class KratosRuntime extends EventEmitter {
 	// so that the frontend can match events with breakpoints.
 	private _breakpointId = 1;
 
+	private _conn: SocketIOClient.Socket | undefined = undefined;
+
 	constructor() {
 		super();
 	}
@@ -36,17 +39,30 @@ export class KratosRuntime extends EventEmitter {
 	 * Start executing the given program.
 	 */
 	public start(program: string, stopOnEntry: boolean) {
-
 		this.loadSource(program);
-
-		this.verifyBreakpoints();
+		// connect to the server
+		this._conn = socket_io("http://localhost:8888");
 
 		if (stopOnEntry) {
 			// we step once
-			this.step('stopOnEntry');
+			this.step();
 		} else {
 			// we just start to run until we hit a breakpoint or an exception
 			this.continue();
+		}
+	}
+
+	private run(is_step: Boolean) {
+		if (this._conn) {
+			if (!is_step) {
+				// send the continue commend
+				this._conn.send();
+			} else {
+				// send the step command
+				this._conn.send();
+			}
+		} else {
+			// inform user that it's not connected to the simulator runtime
 		}
 	}
 
@@ -54,14 +70,14 @@ export class KratosRuntime extends EventEmitter {
 	 * Continue execution to the end/beginning.
 	 */
 	public continue() {
-		this.run(undefined);
+		this.run(false);
 	}
 
 	/**
 	 * Step to the next/previous non empty line.
 	 */
-	public step(event = 'stopOnStep') {
-		this.run(event);
+	public step() {
+		this.run(true);
 	}
 
 
