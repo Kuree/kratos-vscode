@@ -1,8 +1,8 @@
 import { Database } from 'sqlite3'
 import { EventEmitter } from 'events';
 import * as vscode from 'vscode';
-import * as path from 'path'
-import * as socket_io from 'socket.io-client'
+import * as path from 'path';
+import * as socket_io from 'socket.io-client';
 
 export interface KratosBreakpoint {
 	id: number;
@@ -43,13 +43,24 @@ export class KratosRuntime extends EventEmitter {
 		// connect to the server
 		this._conn = socket_io("http://localhost:8888");
 
-		if (stopOnEntry) {
-			// we step once
-			this.step();
-		} else {
-			// we just start to run until we hit a breakpoint or an exception
-			this.continue();
-		}
+		this._conn.on("connect", () => {
+			// send start command
+			if (stopOnEntry) {
+				// we step once
+				this.step();
+			} else {
+				// we just start to run until we hit a breakpoint or an exception
+				this.continue();
+			}
+		});
+
+		// event listeners
+		this._conn.on("breakpoint", (data: string) => {
+			var br_id: number = parseInt(data);
+			this.fireEventsForBreakPoint(br_id);
+		});
+		//
+		
 	}
 
 	private run(is_step: Boolean) {
@@ -92,8 +103,11 @@ export class KratosRuntime extends EventEmitter {
 		if (this._db) {
 			var id: number | undefined = undefined;
 			this._db.get("SELECT id FROM breakpoint WHERE filename = ? and line_num = ?", [filename, line], function(err, row) {
-				id = row.id;
-			})
+				if (!err) {
+					id = row.id;
+				}
+			});
+
 			if (id) {
 				bp.valid = true;
 				this._breakPoints.set(id, bp);
@@ -112,7 +126,8 @@ export class KratosRuntime extends EventEmitter {
 			var id: number | undefined = undefined;
 			this._db.get("SELECT id FROM breakpoint WHERE filename = ? and line_num = ?", [filename, line], function(err, row) {
 				id = row.id;
-			})
+			});
+
 			if (id && this._breakPoints.has(id)) {
 				var bp = this._breakPoints.get(id);
 				this._breakPoints.delete(id);
@@ -129,10 +144,11 @@ export class KratosRuntime extends EventEmitter {
 		// find the filename
 		var filename = path.resolve(filename);
 		if (this._db) {
-			var list: number[] = []
+			var list: number[] = [];
 			this._db.each("SELECT id FROM breakpoint WHERE filename = ?", filename, function(err, row) {
 				list.push(row.id);
-			})
+			});
+
 			list.forEach(id => {
 				if (this._breakPoints.has(id)) {
 					this._breakPoints.delete(id);
@@ -161,8 +177,10 @@ export class KratosRuntime extends EventEmitter {
 					bps.set(filename, new Map<number, number>());
 				}
 				var entry = bps.get(filename);
-				if (entry) entry.set(line_num, br_id);
-			})
+				if (entry) {
+					entry.set(line_num, br_id);
+				}
+			});
 		}
 	}
 
@@ -170,11 +188,12 @@ export class KratosRuntime extends EventEmitter {
 	 * Fire events if the simulator hits a breakpoint
 	 */
 	private fireEventsForBreakPoint(breakpointID: number) {
-		
 		var bp = this._breakPoints.get(breakpointID);
 		if (bp) {
-			this.sendEvent("stopOnBreakpoint")
+			this.sendEvent("stopOnBreakpoint");
 			this.sendEvent("breakpointValidated", bp);
+		} else {
+
 		}
 
 	}

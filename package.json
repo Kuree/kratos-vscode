@@ -49,6 +49,8 @@
 		"@types/socket.io-client": "^1.4.32",
 		"@types/sqlite3": "^3.1.5",
 		"socket.io-client": "^2.2.0",
-		"sqlite3": "^4.1.0"
+		"sqlite3": "^4.1.0",
+		"vscode-debugadapter": "^1.37.1",
+		"vscode-debugprotocol": "^1.37.0"
 	}
 }
