@@ -1,56 +1,106 @@
 {
-	"name": "kratos-vscode",
-	"displayName": "kratos-vscode",
-	"description": "Debugger for kratos generators",
-	"version": "0.0.1",
-	"engines": {
-		"vscode": "^1.33.0"
-	},
-	"categories": [
-		"Debuggers"
-	],
-	"activationEvents": [
-		"onDebug",
-		"onCommand:extension.helloWorld"
-	],
-	"main": "./out/extension.js",
-	"contributes": {
-		"breakpoints": [
-			{
-				"language": "markdown"
-			}
-		],
-		"commands": [
-			{
-				"command": "extension.helloWorld",
-				"title": "Hello World"
-			}
-		]
-	},
-	"scripts": {
-		"vscode:prepublish": "npm run compile",
-		"compile": "tsc -p ./",
-		"watch": "tsc -watch -p ./",
-		"pretest": "npm run compile",
-		"test": "node ./out/test/runTest.js"
-	},
-	"devDependencies": {
-		"@types/glob": "^7.1.1",
-		"@types/mocha": "^5.2.6",
-		"@types/node": "^10.12.21",
-		"@types/vscode": "^1.38.0",
-		"glob": "^7.1.4",
-		"mocha": "^6.1.4",
-		"typescript": "^3.3.1",
-		"tslint": "^5.12.1",
-		"vscode-test": "^1.2.0"
-	},
-	"dependencies": {
-		"@types/socket.io-client": "^1.4.32",
-		"@types/sqlite3": "^3.1.5",
-		"socket.io-client": "^2.2.0",
-		"sqlite3": "^4.1.0",
-		"vscode-debugadapter": "^1.37.1",
-		"vscode-debugprotocol": "^1.37.0"
-	}
+  "name": "kratos-vscode",
+  "displayName": "kratos-vscode",
+  "description": "Debugger for kratos generators",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.33.0"
+  },
+  "categories": [
+    "Debuggers"
+  ],
+  "activationEvents": [
+    "onDebug",
+    "onCommand:extension.kratos-debug.getProgramName"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "breakpoints": [
+      {
+        "language": "python"
+      }
+    ],
+    "debuggers": [
+      {
+        "type": "kratos",
+				"label": "Kratos Debug",
+				"program": "./out/debugAdapter.js",
+				"runtime": "node",
+				"configurationAttributes": {
+					"launch": {
+						"required": [
+							"program"
+						],
+						"properties": {
+							"program": {
+								"type": "string",
+								"description": "Absolute path to a debug file.",
+								"default": "${workspaceFolder}/${command:AskForProgramName}"
+							},
+							"stopOnEntry": {
+								"type": "boolean",
+								"description": "Automatically stop after launch.",
+								"default": true
+							},
+							"trace": {
+								"type": "boolean",
+								"description": "Enable logging of the Debug Adapter Protocol.",
+								"default": true
+							}
+						}
+					}
+				},
+				"initialConfigurations": [
+					{
+						"type": "kratos",
+						"request": "launch",
+						"name": "Ask for debug file",
+						"program": "${workspaceFolder}/${command:AskForProgramName}",
+						"stopOnEntry": true
+					}
+				],
+				"configurationSnippets": [
+					{
+						"label": "Kratos Debug: Launch",
+						"description": "A new configuration for 'debugging' a user selected debug file.",
+						"body": {
+							"type": "kratos",
+							"request": "launch",
+							"name": "Ask for debug file",
+							"program": "^\"\\${workspaceFolder}/\\${command:AskForProgramName}\"",
+							"stopOnEntry": true
+						}
+					}
+				],
+        "variables": {
+					"AskForProgramName": "extension.kratos-debug.getProgramName"
+				}
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "tsc -p ./src",
+    "compile": "tsc -p ./src",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/glob": "^7.1.1",
+    "@types/mocha": "^5.2.6",
+    "@types/node": "^10.12.21",
+    "@types/vscode": "^1.38.0",
+    "glob": "^7.1.4",
+    "mocha": "^6.1.4",
+    "typescript": "^3.3.1",
+    "tslint": "^5.12.1",
+    "vscode-test": "^1.2.0",
+    "vscode-debugadapter-testsupport": "^1.37.1"
+  },
+  "dependencies": {
+    "@types/better-sqlite3": "^5.4.0",
+    "@types/socket.io-client": "^1.4.32",
+    "better-sqlite3": "^5.4.3",
+    "socket.io-client": "^2.2.0",
+    "vscode-debugadapter": "^1.37.1",
+    "vscode-debugprotocol": "^1.37.0"
+  }
 }
