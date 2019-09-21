@@ -23,58 +23,58 @@
     "debuggers": [
       {
         "type": "kratos",
-				"label": "Kratos Debug",
-				"program": "./out/debugAdapter.js",
-				"runtime": "node",
-				"configurationAttributes": {
-					"launch": {
-						"required": [
-							"program"
-						],
-						"properties": {
-							"program": {
-								"type": "string",
-								"description": "Absolute path to a debug file.",
-								"default": "${workspaceFolder}/${command:AskForProgramName}"
-							},
-							"stopOnEntry": {
-								"type": "boolean",
-								"description": "Automatically stop after launch.",
-								"default": true
-							},
-							"trace": {
-								"type": "boolean",
-								"description": "Enable logging of the Debug Adapter Protocol.",
-								"default": true
-							}
-						}
-					}
-				},
-				"initialConfigurations": [
-					{
-						"type": "kratos",
-						"request": "launch",
-						"name": "Ask for debug file",
-						"program": "${workspaceFolder}/${command:AskForProgramName}",
-						"stopOnEntry": true
-					}
-				],
-				"configurationSnippets": [
-					{
-						"label": "Kratos Debug: Launch",
-						"description": "A new configuration for 'debugging' a user selected debug file.",
-						"body": {
-							"type": "kratos",
-							"request": "launch",
-							"name": "Ask for debug file",
-							"program": "^\"\\${workspaceFolder}/\\${command:AskForProgramName}\"",
-							"stopOnEntry": true
-						}
-					}
-				],
+        "label": "Kratos Debug",
+        "program": "./out/debugAdapter.js",
+        "runtime": "node",
+        "configurationAttributes": {
+          "launch": {
+            "required": [
+              "program"
+            ],
+            "properties": {
+              "program": {
+                "type": "string",
+                "description": "Absolute path to a debug file.",
+                "default": "${workspaceFolder}/${command:AskForProgramName}"
+              },
+              "stopOnEntry": {
+                "type": "boolean",
+                "description": "Automatically stop after launch.",
+                "default": true
+              },
+              "trace": {
+                "type": "boolean",
+                "description": "Enable logging of the Debug Adapter Protocol.",
+                "default": true
+              }
+            }
+          }
+        },
+        "initialConfigurations": [
+          {
+            "type": "kratos",
+            "request": "launch",
+            "name": "Ask for debug file",
+            "program": "${workspaceFolder}/${command:AskForProgramName}",
+            "stopOnEntry": true
+          }
+        ],
+        "configurationSnippets": [
+          {
+            "label": "Kratos Debug: Launch",
+            "description": "A new configuration for 'debugging' a user selected debug file.",
+            "body": {
+              "type": "kratos",
+              "request": "launch",
+              "name": "Ask for debug file",
+              "program": "^\"\\${workspaceFolder}/\\${command:AskForProgramName}\"",
+              "stopOnEntry": true
+            }
+          }
+        ],
         "variables": {
-					"AskForProgramName": "extension.kratos-debug.getProgramName"
-				}
+          "AskForProgramName": "extension.kratos-debug.getProgramName"
+        }
       }
     ]
   },
@@ -96,10 +96,10 @@
     "vscode-debugadapter-testsupport": "^1.37.1"
   },
   "dependencies": {
-    "@types/better-sqlite3": "^5.4.0",
     "@types/socket.io-client": "^1.4.32",
-    "better-sqlite3": "^5.4.3",
+    "@types/sqlite3": "^3.1.5",
     "socket.io-client": "^2.2.0",
+    "sqlite3": "^4.1.0",
     "vscode-debugadapter": "^1.37.1",
     "vscode-debugprotocol": "^1.37.0"
   }
