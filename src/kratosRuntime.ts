@@ -205,6 +205,12 @@ export class KratosRuntime extends EventEmitter {
 
 			} else {
 				this._connected = true;
+				// request all the files and open them
+				request.get(`http://${this._runtimeIP}:${this._runtimePort}/files`, (_, __, body)=> {
+					body.forEach((file: string) => {
+						vscode.workspace.openTextDocument(file);
+					});
+				});
 			}
 		});
 	}
