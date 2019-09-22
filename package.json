@@ -96,10 +96,12 @@
     "vscode-debugadapter-testsupport": "^1.37.1"
   },
   "dependencies": {
-    "@types/socket.io-client": "^1.4.32",
-    "@types/sqlite3": "^3.1.5",
-    "socket.io-client": "^2.2.0",
-    "sqlite3": "^4.1.0",
+    "@types/express": "^4.17.1",
+    "@types/request": "^2.48.3",
+    "await-notify": "^1.0.1",
+    "express": "^4.17.1",
+    "request": "^2.88.0",
+    "sync-request": "^6.1.0",
     "vscode-debugadapter": "^1.37.1",
     "vscode-debugprotocol": "^1.37.0"
   }

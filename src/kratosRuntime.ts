@@ -1,9 +1,8 @@
-import { Database } from 'sqlite3'
 import { EventEmitter } from 'events';
 import * as vscode from 'vscode';
 import * as path from 'path';
-import * as socket_io from 'socket.io-client';
-import { resolve } from 'url';
+import * as request from 'request';
+import * as express from 'express';
 
 export interface KratosBreakpoint {
 	id: number;
@@ -15,12 +14,6 @@ export interface KratosBreakpoint {
 
 export class KratosRuntime extends EventEmitter {
 
-	private _debugFile: string = "";
-	private _db: Database | undefined = undefined;
-	public get debugFile() {
-		return this._debugFile;
-	}
-
 	// maps from id to the actual breakpoint
 	private _breakPoints = new Map<number, KratosBreakpoint>();
 
@@ -28,7 +21,10 @@ export class KratosRuntime extends EventEmitter {
 	// so that the frontend can match events with breakpoints.
 	private _breakpointId = 1;
 
-	private _conn: SocketIOClient.Socket | undefined = undefined;
+	// need to pull this from configuration
+	private _runtimeIP = "0.0.0.0";
+	private _runtimePort = 8888;
+	private _connected = false;
 
 	constructor() {
 		super();
@@ -38,41 +34,43 @@ export class KratosRuntime extends EventEmitter {
 	 * Start executing the given program.
 	 */
 	public start(program: string, stopOnEntry: boolean) {
-		this.loadSource(program);
+		// setup the local server
+		var app = express();
+		app.post("/status/breakpoint", (req, res) => {
+			// we will get a list of values
+			var payload: Array<string> = JSON.parse(req.body);
+			var names = payload["value"];
+			var id = Number.parseInt(payload["id"]);
+			this.fireEventsForBreakPoint(id);
+
+			names.forEach((name: string) => {
+				// get values
+				request.get(`http://${this._runtimeIP}:${this._runtimePort}/value/${name}`, (_, res, body)=> {
+					console.log(body);
+				});
+			});
+		});
+
+		app.listen(this._runtimePort, this._runtimeIP, function() {});
+
+		this.connectRuntime(program);
 		// connect to the server
-		this._conn = socket_io("http://localhost:8888");
-
-		this._conn.on("connect", () => {
-			// send all breakpoints over
-			this._breakPoints.forEach((bp, key, _) => {
-				
-			})
-			// send start command
-			if (stopOnEntry) {
-				// it's paused by default in the simulation runtime
-			} else {
-				// we just start to run until we hit a breakpoint or an exception
-				this.continue();
-			}
-		});
-
-		// event listeners
-		this._conn.on("breakpoint", (data: string) => {
-			var br_id: number = parseInt(data);
-			this.fireEventsForBreakPoint(br_id);
-		});
-		//
 		
 	}
 
 	private run(is_step: Boolean) {
-		if (this._conn) {
+		if (this._connected) {
 			if (!is_step) {
 				// send the continue commend
-				this._conn.send();
+				if (this._connected) {
+					request.post(`http://${this._runtimeIP}:${this._runtimePort}/continue`);
+				}
+
 			} else {
 				// send the step command
-				this._conn.send();
+				if (this._connected) {
+					request.post(`http://${this._runtimeIP}:${this._runtimePort}/continue`);
+				}
 			}
 		} else {
 			// inform user that it's not connected to the simulator runtime
@@ -102,22 +100,24 @@ export class KratosRuntime extends EventEmitter {
 		var filename = path.resolve(filename);
 		var bp = <KratosBreakpoint> { valid: false, line, id: this._breakpointId++, filename: filename };
 
-		if (this._db) {
-			this.getAsync("SELECT id FROM breakpoint WHERE filename = ? and line_num = ?", [filename, line]).then((row: any) => {
-				if (row) {
-					var id = row.id;
-					this._breakPoints.set(id, bp);
-					if (this._conn) {
-						this.sendBreakpoint(id);
-					}
-					bp.valid = true;
-					// send the event to validate the break point
-				}	
-			}).catch((err) => {
-				// handle err
-			});
-					
-		}
+		var payload = {filename: filename, line_num: line};
+		var url = `http://${this._runtimeIP}:${this._runtimePort}/breakpoint`;
+		var options = {
+			method: "get",
+			body: payload,
+			json: true,
+			url: url
+		};
+		request(options, (_, res, body) => {
+			if (res.statusCode === 200) {
+				bp.valid = true;
+				this.sendEvent('breakpointValidated', bp);
+				var id = Number.parseInt(body);
+				this._breakPoints.set(id, bp);
+				this.sendBreakpoint(id);
+			}
+		});
+
 		return bp;
 	}
 
@@ -128,17 +128,8 @@ export class KratosRuntime extends EventEmitter {
 		// get the absolute path
 		var filename = path.resolve(filename);
 		var bp: KratosBreakpoint| undefined = undefined;
-		if (this._db) {
-			await this.getAsync("SELECT id FROM breakpoint WHERE filename = ? and line_num = ?", [filename, line]).then((row: any) => {
-				const id = row.id;
-				if (this._breakPoints.has(id)) {
-					bp = this._breakPoints.get(id);
-					this._breakPoints.delete(id);
-					// remove the id from the simulator
-					this.sendRemoveBreakpoint(id);
-				}
-			});
-		}
+		this.sendRemoveBreakpoint(filename, line);
+
 		return bp;
 	}
 
@@ -148,94 +139,74 @@ export class KratosRuntime extends EventEmitter {
 	public clearBreakpoints(filename: string): void {
 		// find the filename
 		var filename = path.resolve(filename);
-		if (this._db) {
-			this._db.each("SELECT id FROM breakpoint WHERE filename = ?", filename, (_, row)=> {
-				const id = row.id;
-				if (this._breakPoints.has(id)) {
-					this._breakPoints.delete(id);
-					// remove the id from the simulator
-					this.sendRemoveBreakpoint(id);
-				}
-			});
-		}
+		this.sendRemoveBreakpoints(filename);
 	}
 
-	public getBreakpoints(filename: string, line: number) : Array<number> {
-		if (this._db) {
-			const stmt = this._db.prepare("SELECT * FROM breakpoint where filename = ? and line_num = ?");
-			const row = stmt.get(filename, line);
-			if (row) {
-				return [0];
-			} else {
-				return [];
+	public getBreakpoints(filename: string, line: number, fn: (id: number) => void) {
+		var payload = {filename: filename, line_num: line};
+		var url = `http://${this._runtimeIP}:${this._runtimePort}/breakpoint`;
+		var options = {
+			method: "get",
+			body: payload,
+			json: true,
+			url: url
+		};
+		request(options, (_, res, body) => {
+			if (res.statusCode === 200) {
+				fn(0);
 			}
-		}
-		return [];
+		});
 	}
 
 	// private methods
 
 	private sendBreakpoint(break_id: number) {
-		if (this._conn) {
-			var bp = this._breakPoints.get(break_id);
-			if (bp) {
-				bp.valid = true;
-				this._conn.send("breakpoint_add", break_id.toString());
-				// update the gui
-				this.sendEvent('breakpointValidated', bp);
-			}
-		}
+		var url = `http://${this._runtimeIP}:${this._runtimePort}/breakpoint${break_id}`;
+		request.post(url);
 	}
 
-	private sendRemoveBreakpoint(break_id: number) {
-		if (this._conn) {
-			var bp = this._breakPoints.get(break_id);
-			if (bp) {
-				this._conn.send("breakpoint_remove", break_id.toString());
-			}
-		}
+	private sendRemoveBreakpoint(filename: string, line_num: Number) {
+		var payload = {filename: filename, line_num: line_num};
+		var url = `http://${this._runtimeIP}:${this._runtimePort}/breakpoint`;
+		var options = {
+			method: "delete",
+			body: payload,
+			json: true,
+			url: url
+		};
+		request(options);
 	}
 
-	private loadSource(file: string) {
-		if (this._debugFile !== file) {
-			this._debugFile = file;
-			// load sqlite3
-			// we use read only mode
-			this._db = new Database(file);
-			// run a query to get all available breakpoints
-			var bps = new Map<string, Map<number, number>>();
-			this._db.each("SELECT * FROM breakpoint", (_, row) => {
-				var br_id: number = row.id;
-				var filename: string = row.filename;
-				var line_num: number = row.line_num;
-				// open these files from the workspace
-				vscode.workspace.openTextDocument(filename);
-				// create maps of the break points
-				if (!bps.has(filename)) {
-					bps.set(filename, new Map<number, number>());
-				}
-				var entry = bps.get(filename);
-				if (entry) {
-					entry.set(line_num, br_id);
-				}
-			});
-		}
+	private sendRemoveBreakpoints(filename: string) {
+		var payload = {filename: filename};
+		var url = `http://${this._runtimeIP}:${this._runtimePort}/breakpoint/file`;
+		var options = {
+			method: "delete",
+			body: payload,
+			json: true,
+			url: url
+		};
+		request(options);
 	}
 
-	private getAsync(sql, params) {
-		return new Promise((resolve, reject) => {
-			if (this._db) {
-				this._db.get(sql, params, function(err, row) {
-					if (err) {
-						reject(err);
-					} else {
-						resolve(row);
-					}
-				})
+	private connectRuntime(file: string) {
+		// resolve it to make it absolute path
+		file = path.resolve(file);
+		var payload = {ip: this._runtimeIP, port: this._runtimePort, database: file};
+		var url = `http://${this._runtimeIP}:${this._runtimePort}/connect`;
+		var options = {
+			method: "post",
+			body: payload,
+			json: true,
+			url: url
+		};
+		request(options, (_, res, __) => {
+			if (res.statusCode !== 200) {
+
 			} else {
-				reject();
+				this._connected = true;
 			}
-		})
+		});
 	}
 
 	/**

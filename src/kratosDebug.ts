@@ -171,21 +171,22 @@ export class KratosDebugSession extends LoggingDebugSession {
 	protected breakpointLocationsRequest(response: DebugProtocol.BreakpointLocationsResponse, args: DebugProtocol.BreakpointLocationsArguments, request?: DebugProtocol.Request): void {
 
 		if (args.source.path) {
-			const bps = this._runtime.getBreakpoints(args.source.path, this.convertClientLineToDebugger(args.line));
-			response.body = {
-				breakpoints: bps.map(col => {
-					return {
-						line: args.line,
-						column: this.convertDebuggerColumnToClient(col)
-					}
-				})
-			};
+			this._runtime.getBreakpoints(args.source.path, this.convertClientLineToDebugger(args.line), (col) => {
+				response.body = {
+					breakpoints: [{
+							line: args.line,
+							column: this.convertDebuggerColumnToClient(col)
+						}]
+				};
+				this.sendResponse(response);
+			});
+
 		} else {
 			response.body = {
 				breakpoints: []
 			};
+			this.sendResponse(response);
 		}
-		this.sendResponse(response);
 	}
 
 	protected threadsRequest(response: DebugProtocol.ThreadsResponse): void {
