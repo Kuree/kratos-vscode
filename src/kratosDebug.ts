@@ -2,7 +2,7 @@ import {
 	Logger, logger,
 	LoggingDebugSession,
 	InitializedEvent, TerminatedEvent, StoppedEvent, BreakpointEvent, OutputEvent,
-	Thread, Scope, Source, Handles, Breakpoint
+	Thread, StackFrame, Scope, Source, Handles, Breakpoint
 } from 'vscode-debugadapter';
 import { DebugProtocol } from 'vscode-debugprotocol';
 import { basename } from 'path';
@@ -96,10 +96,10 @@ export class KratosDebugSession extends LoggingDebugSession {
 		response.body.supportsStepBack = true;
 
 		// make VS Code to support data breakpoints
-		response.body.supportsDataBreakpoints = true;
+		response.body.supportsDataBreakpoints = false;
 
 		// make VS Code to support completion in REPL
-		response.body.supportsCompletionsRequest = true;
+		response.body.supportsCompletionsRequest = false;
 		response.body.completionTriggerCharacters = [ ".", "[" ];
 
 		// make VS Code to send cancelRequests
@@ -196,6 +196,17 @@ export class KratosDebugSession extends LoggingDebugSession {
 		this.sendResponse(response);
 	}
 
+	protected stackTraceRequest(response: DebugProtocol.StackTraceResponse, args: DebugProtocol.StackTraceArguments): void {
+
+		const stk = this._runtime.stack();
+
+		response.body = {
+			stackFrames: stk.frames.map((f: { index: number; name: string; file: string; line: number; }) => new StackFrame(f.index, f.name, this.createSource(f.file), this.convertDebuggerLineToClient(f.line))),
+			totalFrames: stk.count
+		};
+		this.sendResponse(response);
+	}
+
 	protected scopesRequest(response: DebugProtocol.ScopesResponse, args: DebugProtocol.ScopesArguments): void {
 
 		response.body = {
@@ -211,8 +222,19 @@ export class KratosDebugSession extends LoggingDebugSession {
 
 		const variables: DebugProtocol.Variable[] = [];
 
-		// TODO
-		// implement this
+		const id = this._variableHandles.get(args.variablesReference);
+
+		if (id) {
+			var vars = await this._runtime.getCurrentVariables();
+			vars.forEach((entry: {name: string, value: any}) => {
+				variables.push({
+					name: entry.name,
+					type: "integer",
+					value: entry.value.toString(),
+					variablesReference: 0
+				});
+			});
+		}
 
 		response.body = {
 			variables: variables

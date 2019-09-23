@@ -3,6 +3,8 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as request from 'request';
 import * as express from 'express';
+import * as http from 'http';
+import * as bodyParser from 'body-parser';
 
 export interface KratosBreakpoint {
 	id: number;
@@ -21,10 +23,15 @@ export class KratosRuntime extends EventEmitter {
 	// so that the frontend can match events with breakpoints.
 	private _breakpointId = 1;
 
+	private _current_breakpoint_id = -1;
+	private _current_variables = new Map<string, string>();
+
 	// need to pull this from configuration
 	private _runtimeIP = "0.0.0.0";
 	private _runtimePort = 8888;
+	private _debuggerPort = 8889;
 	private _connected = false;
+	private _app: express.Application;
 
 	constructor() {
 		super();
@@ -35,30 +42,50 @@ export class KratosRuntime extends EventEmitter {
 	 */
 	public start(program: string, stopOnEntry: boolean) {
 		// setup the local server
-		var app = express();
-		app.post("/status/breakpoint", (req, res) => {
+		this._app = express();
+		this._app.use(bodyParser.json());
+		this._app.post("/status/breakpoint", (req, res) => {
 			// we will get a list of values
-			var payload: Array<string> = JSON.parse(req.body);
-			var names = payload["value"];
+			var payload: Array<string> = req.body;
+			var names: Object = payload["value"];
 			var id = Number.parseInt(payload["id"]);
+			this._current_breakpoint_id = id;
+			this._current_variables = new Map<string, string>(Object.entries(names));
 			this.fireEventsForBreakPoint(id);
-
-			names.forEach((name: string) => {
-				// get values
-				request.get(`http://${this._runtimeIP}:${this._runtimePort}/value/${name}`, (_, res, body) => {
-					console.log(body);
-				});
-			});
 		});
 
-		app.listen(this._runtimePort, this._runtimeIP, function () { });
+		var server = http.createServer(this._app).listen(this._debuggerPort, this._runtimeIP);
+
+		this._app.post("/stop", (_, __) => {
+			server.close();
+			this.sendEvent('end');
+		});
 
 		// connect to the server
 		this.connectRuntime(program);
 		if (stopOnEntry) {
 			this.sendEvent('stopOnEntry');
 		}
+	}
 
+	public async getCurrentVariables() {
+		var promises: Array<Promise<{name: string, value: any}>> = [];
+		var getValue = (name: string, handle: string): Promise<{name: string, value: any}> => {
+			return new Promise((resolve, reject) => {
+				request.get(`http://${this._runtimeIP}:${this._runtimePort}/value/${handle}`, (_, res, body) => {
+					if (res.statusCode === 200) {
+						resolve({name: name, value: Number.parseInt(body)});
+					} else {
+						reject("Unknown value");
+					}
+				});
+			});
+		};
+		this._current_variables.forEach((handle: string, name: string) => {
+			promises.push(getValue(name, handle));
+		});
+		var vars: Array<{name: string, value: any}> = await Promise.all(promises);
+		return vars;
 	}
 
 	private run(is_step: Boolean) {
@@ -163,6 +190,30 @@ export class KratosRuntime extends EventEmitter {
 		});
 	}
 
+	public stack() {
+		// we only have one stack frame
+		var frames : Array<any> = [];
+		if (this._current_breakpoint_id >= 0) {
+			// it's been set
+			var bp = this._breakPoints.get(this._current_breakpoint_id);
+			if (bp) {
+				// get the filename and line number;
+				var filename = bp.filename;
+				var line_num = bp.line;
+				frames.push({
+					index: 0,
+					name: "Simulator Frame",
+					file: filename,
+					line: line_num
+				});
+			}
+		}
+		return {
+			frames: frames,
+			count: 1
+		};
+	}
+
 	// private methods
 
 	private sendBreakpoint(break_id: number) {
@@ -197,7 +248,7 @@ export class KratosRuntime extends EventEmitter {
 	private connectRuntime(file: string) {
 		// resolve it to make it absolute path
 		file = path.resolve(file);
-		var payload = { ip: this._runtimeIP, port: this._runtimePort, database: file };
+		var payload = { ip: this._runtimeIP, port: this._debuggerPort, database: file };
 		var url = `http://${this._runtimeIP}:${this._runtimePort}/connect`;
 		var options = {
 			method: "post",
