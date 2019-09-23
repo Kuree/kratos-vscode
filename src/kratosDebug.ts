@@ -1,7 +1,3 @@
-/*---------------------------------------------------------
- * Copyright (C) Microsoft Corporation. All rights reserved.
- *--------------------------------------------------------*/
-
 import {
 	Logger, logger,
 	LoggingDebugSession,
@@ -42,8 +38,8 @@ export class KratosDebugSession extends LoggingDebugSession {
 	public constructor() {
 		super("kratos-debug.txt");
 
-		// this debugger uses zero-based lines and columns
-		this.setDebuggerLinesStartAt1(false);
+		// this debugger uses 1-based lines and columns
+		this.setDebuggerLinesStartAt1(true);
 		this.setDebuggerColumnsStartAt1(false);
 
 		this._runtime = new KratosRuntime();
@@ -253,6 +249,6 @@ export class KratosDebugSession extends LoggingDebugSession {
 	//---- helpers
 
 	private createSource(filePath: string): Source {
-		return new Source(basename(filePath), this.convertDebuggerPathToClient(filePath), undefined, undefined, 'mock-adapter-data');
+		return new Source(basename(filePath), this.convertDebuggerPathToClient(filePath), undefined, undefined, 'kratos-adapter-data');
 	}
 }

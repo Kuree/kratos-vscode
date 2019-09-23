@@ -4,6 +4,7 @@ import * as vscode from 'vscode';
 import { WorkspaceFolder, DebugConfiguration, ProviderResult, CancellationToken } from 'vscode';
 import { KratosDebugSession } from './kratosDebug';
 import * as Net from 'net';
+import * as path from 'path';
 
 export function activate(context: vscode.ExtensionContext) {
 
@@ -36,18 +37,41 @@ class KratosConfigurationProvider implements vscode.DebugConfigurationProvider {
 	 * Massage a debug configuration just before a debug session is being launched,
 	 * e.g. add all missing attributes to the debug configuration.
 	 */
-	resolveDebugConfiguration(folder: WorkspaceFolder | undefined, config: DebugConfiguration, token?: CancellationToken): ProviderResult<DebugConfiguration> {
+	async resolveDebugConfiguration(folder: WorkspaceFolder | undefined, config: DebugConfiguration, token?: CancellationToken): Promise<ProviderResult<DebugConfiguration>> {
 
 		// if launch.json is missing or empty
 		if (!config.type && !config.request && !config.name) {
-			const editor = vscode.window.activeTextEditor;
-			if (editor && editor.document.languageId === 'markdown') {
-				config.type = 'kratos';
-				config.name = 'Launch';
-				config.request = 'launch';
-				config.program = '${file}';
-				config.stopOnEntry = true;
+			config.type = 'kratos';
+			config.name = 'Launch';
+			config.request = 'launch';
+			// config.program = '${file}';
+			config.stopOnEntry = true;
+		}
+		var promise: Array<Promise<string>> = [];
+		if (!config.program) {
+			// trying to find a db file in the current working directory
+			// make a promise
+			function findDirPromise(dir: vscode.WorkspaceFolder): Promise<string> {
+				return new Promise((resolve, _) => {
+					vscode.workspace.fs.readDirectory(dir.uri).then((files) => {
+						files.forEach((filename, _) => {
+							if (filename[0].split(".").pop() === "db") {
+								resolve(path.join(dir.uri.fsPath, filename[0]));
+							}
+						});
+					});
+				});
 			}
+			var folders = vscode.workspace.workspaceFolders;
+			if (folders) {
+				folders.forEach((dir: vscode.WorkspaceFolder) => {
+					promise.push(findDirPromise(dir));
+				});
+			}
+		}
+		const result = await Promise.all(promise);
+		if (result.length > 0) {
+			config.program = result[0];
 		}
 
 		if (!config.program) {

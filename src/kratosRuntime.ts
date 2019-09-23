@@ -45,17 +45,20 @@ export class KratosRuntime extends EventEmitter {
 
 			names.forEach((name: string) => {
 				// get values
-				request.get(`http://${this._runtimeIP}:${this._runtimePort}/value/${name}`, (_, res, body)=> {
+				request.get(`http://${this._runtimeIP}:${this._runtimePort}/value/${name}`, (_, res, body) => {
 					console.log(body);
 				});
 			});
 		});
 
-		app.listen(this._runtimePort, this._runtimeIP, function() {});
+		app.listen(this._runtimePort, this._runtimeIP, function () { });
 
-		this.connectRuntime(program);
 		// connect to the server
-		
+		this.connectRuntime(program);
+		if (stopOnEntry) {
+			this.sendEvent('stopOnEntry');
+		}
+
 	}
 
 	private run(is_step: Boolean) {
@@ -95,15 +98,15 @@ export class KratosRuntime extends EventEmitter {
 	/*
 	 * Set breakpoint in file with given line.
 	 */
-	public setBreakPoint(filename: string, line: number) : KratosBreakpoint {
+	public setBreakPoint(filename: string, line: number): KratosBreakpoint {
 		// get the absolute path
 		var filename = path.resolve(filename);
-		var bp = <KratosBreakpoint> { valid: false, line, id: this._breakpointId++, filename: filename };
+		var bp = <KratosBreakpoint>{ valid: false, line, id: this._breakpointId++, filename: filename };
 
-		var payload = {filename: filename, line_num: line};
+		var payload = { filename: filename, line_num: line };
 		var url = `http://${this._runtimeIP}:${this._runtimePort}/breakpoint`;
 		var options = {
-			method: "get",
+			method: "post",
 			body: payload,
 			json: true,
 			url: url
@@ -115,6 +118,8 @@ export class KratosRuntime extends EventEmitter {
 				var id = Number.parseInt(body);
 				this._breakPoints.set(id, bp);
 				this.sendBreakpoint(id);
+			} else {
+				return vscode.window.showInformationMessage("Cannot set breakpoint");
 			}
 		});
 
@@ -127,7 +132,7 @@ export class KratosRuntime extends EventEmitter {
 	public async clearBreakPoint(filename: string, line: number) {
 		// get the absolute path
 		var filename = path.resolve(filename);
-		var bp: KratosBreakpoint| undefined = undefined;
+		var bp: KratosBreakpoint | undefined = undefined;
 		this.sendRemoveBreakpoint(filename, line);
 
 		return bp;
@@ -143,7 +148,7 @@ export class KratosRuntime extends EventEmitter {
 	}
 
 	public getBreakpoints(filename: string, line: number, fn: (id: number) => void) {
-		var payload = {filename: filename, line_num: line};
+		var payload = { filename: filename, line_num: line };
 		var url = `http://${this._runtimeIP}:${this._runtimePort}/breakpoint`;
 		var options = {
 			method: "get",
@@ -166,7 +171,7 @@ export class KratosRuntime extends EventEmitter {
 	}
 
 	private sendRemoveBreakpoint(filename: string, line_num: Number) {
-		var payload = {filename: filename, line_num: line_num};
+		var payload = { filename: filename, line_num: line_num };
 		var url = `http://${this._runtimeIP}:${this._runtimePort}/breakpoint`;
 		var options = {
 			method: "delete",
@@ -178,7 +183,7 @@ export class KratosRuntime extends EventEmitter {
 	}
 
 	private sendRemoveBreakpoints(filename: string) {
-		var payload = {filename: filename};
+		var payload = { filename: filename };
 		var url = `http://${this._runtimeIP}:${this._runtimePort}/breakpoint/file`;
 		var options = {
 			method: "delete",
@@ -192,7 +197,7 @@ export class KratosRuntime extends EventEmitter {
 	private connectRuntime(file: string) {
 		// resolve it to make it absolute path
 		file = path.resolve(file);
-		var payload = {ip: this._runtimeIP, port: this._runtimePort, database: file};
+		var payload = { ip: this._runtimeIP, port: this._runtimePort, database: file };
 		var url = `http://${this._runtimeIP}:${this._runtimePort}/connect`;
 		var options = {
 			method: "post",
@@ -206,9 +211,21 @@ export class KratosRuntime extends EventEmitter {
 			} else {
 				this._connected = true;
 				// request all the files and open them
-				request.get(`http://${this._runtimeIP}:${this._runtimePort}/files`, (_, __, body)=> {
+				request.get(`http://${this._runtimeIP}:${this._runtimePort}/files`, (_, __, body) => {
+					body = JSON.parse(body);
+					var opened_dirs = new Set<string>();
 					body.forEach((file: string) => {
-						vscode.workspace.openTextDocument(file);
+						// need to open the workspace
+						var base_dir = path.dirname(file);
+						if (!opened_dirs.has(base_dir)) {
+							vscode.workspace.updateWorkspaceFolders(vscode.workspace.workspaceFolders ?
+								vscode.workspace.workspaceFolders.length : 0, null, { uri: vscode.Uri.file(base_dir)});
+							opened_dirs.add(base_dir);
+						}
+						var res = vscode.workspace.openTextDocument(vscode.Uri.file(file));
+						if (!res) {
+							return vscode.window.showInformationMessage("Unable to open document");
+						}
 					});
 				});
 			}
@@ -228,7 +245,7 @@ export class KratosRuntime extends EventEmitter {
 
 	}
 
-	private sendEvent(event: string, ... args: any[]) {
+	private sendEvent(event: string, ...args: any[]) {
 		setImmediate(_ => {
 			this.emit(event, ...args);
 		});
