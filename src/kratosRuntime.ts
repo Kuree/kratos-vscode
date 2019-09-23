@@ -33,8 +33,26 @@ export class KratosRuntime extends EventEmitter {
 	private _connected = false;
 	private _app: express.Application;
 
+	private _step_filename: string;
+	private _step_line_num: number;
+
+	public step_filename() { return this._step_filename; }
+	public step_line_num() { return this._step_line_num; }
+
 	constructor() {
 		super();
+	}
+
+	private on_breakpoint(req, res) {
+		// we will get a list of values
+		var payload: Array<string> = req.body;
+		var names: Object = payload["value"];
+		var id = Number.parseInt(payload["id"]);
+		this._step_filename = payload["filename"];
+		this._step_line_num = Number.parseInt(payload["line_num"]);
+		this._current_breakpoint_id = id;
+		this._current_variables = new Map<string, string>(Object.entries(names));
+		this.fireEventsForBreakPoint(id);
 	}
 
 	/**
@@ -45,13 +63,11 @@ export class KratosRuntime extends EventEmitter {
 		this._app = express();
 		this._app.use(bodyParser.json());
 		this._app.post("/status/breakpoint", (req, res) => {
-			// we will get a list of values
-			var payload: Array<string> = req.body;
-			var names: Object = payload["value"];
-			var id = Number.parseInt(payload["id"]);
-			this._current_breakpoint_id = id;
-			this._current_variables = new Map<string, string>(Object.entries(names));
-			this.fireEventsForBreakPoint(id);
+			this.on_breakpoint(req, res);
+		});
+
+		this._app.post("/status/step", (req, res) => {
+			this.on_breakpoint(req, res);
 		});
 
 		var server = http.createServer(this._app).listen(this._debuggerPort, this._runtimeIP);
@@ -99,7 +115,7 @@ export class KratosRuntime extends EventEmitter {
 			} else {
 				// send the step command
 				if (this._connected) {
-					request.post(`http://${this._runtimeIP}:${this._runtimePort}/continue`);
+					request.post(`http://${this._runtimeIP}:${this._runtimePort}/step_over`);
 				}
 			}
 		} else {
@@ -198,14 +214,24 @@ export class KratosRuntime extends EventEmitter {
 			var bp = this._breakPoints.get(this._current_breakpoint_id);
 			if (bp) {
 				// get the filename and line number;
-				var filename = bp.filename;
-				var line_num = bp.line;
+				const filename = bp.filename;
+				const line_num = bp.line;
 				frames.push({
 					index: 0,
 					name: "Simulator Frame",
 					file: filename,
 					line: line_num
 				});
+			} else {
+				const filename = this.step_filename();
+				const line_num = this.step_line_num();
+				frames.push({
+					index: 0,
+					name: "Simulator Frame",
+					file: filename,
+					line: line_num
+				});
+
 			}
 		}
 		return {
@@ -291,7 +317,7 @@ export class KratosRuntime extends EventEmitter {
 		if (bp) {
 			this.sendEvent("stopOnBreakpoint");
 		} else {
-
+			this.sendEvent("stopOnBreakpoint");
 		}
 
 	}

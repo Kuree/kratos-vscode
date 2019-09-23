@@ -29,7 +29,7 @@ export class KratosDebugSession extends LoggingDebugSession {
 
 	private _configurationDone = new Subject();
 
-	private _cancelationTokens = new Map<number, boolean>();
+	private _cancellationTokens = new Map<number, boolean>();
 
 	/**
 	 * Creates a new debug adapter that is used for one debug session.
@@ -93,7 +93,9 @@ export class KratosDebugSession extends LoggingDebugSession {
 		response.body.supportsEvaluateForHovers = true;
 
 		// make VS Code to show a 'step back' button
-		response.body.supportsStepBack = true;
+		response.body.supportsStepBack = false;
+
+		response.body.supportsStepInTargetsRequest = false;
 
 		// make VS Code to support data breakpoints
 		response.body.supportsDataBreakpoints = false;
@@ -196,7 +198,7 @@ export class KratosDebugSession extends LoggingDebugSession {
 		this.sendResponse(response);
 	}
 
-	protected stackTraceRequest(response: DebugProtocol.StackTraceResponse, args: DebugProtocol.StackTraceArguments): void {
+	protected stackTraceRequest(response: DebugProtocol.StackTraceResponse, args: DebugProtocol.StackTraceArguments) {
 
 		const stk = this._runtime.stack();
 
@@ -247,24 +249,14 @@ export class KratosDebugSession extends LoggingDebugSession {
 		this.sendResponse(response);
 	}
 
-	protected reverseContinueRequest(response: DebugProtocol.ReverseContinueResponse, args: DebugProtocol.ReverseContinueArguments) : void {
-		this._runtime.continue();
-		this.sendResponse(response);
- 	}
-
 	protected nextRequest(response: DebugProtocol.NextResponse, args: DebugProtocol.NextArguments): void {
-		this._runtime.step();
-		this.sendResponse(response);
-	}
-
-	protected stepBackRequest(response: DebugProtocol.StepBackResponse, args: DebugProtocol.StepBackArguments): void {
 		this._runtime.step();
 		this.sendResponse(response);
 	}
 
 	protected cancelRequest(response: DebugProtocol.CancelResponse, args: DebugProtocol.CancelArguments) {
 		if (args.requestId) {
-			this._cancelationTokens.set(args.requestId, true);
+			this._cancellationTokens.set(args.requestId, true);
 		}
 	}
 
