@@ -213,8 +213,8 @@ export class KratosDebugSession extends LoggingDebugSession {
 
 		response.body = {
 			scopes: [
-				new Scope("Local", this._variableHandles.create("local"), false),
-				new Scope("Global", this._variableHandles.create("global"), true)
+				new Scope("Generator Variables", this._variableHandles.create("local"), false),
+				new Scope("Simulator Values", this._variableHandles.create("global"), true)
 			]
 		};
 		this.sendResponse(response);
@@ -226,13 +226,24 @@ export class KratosDebugSession extends LoggingDebugSession {
 
 		const id = this._variableHandles.get(args.variablesReference);
 
-		if (id) {
-			var vars = await this._runtime.getCurrentVariables();
+		// 0 is local
+		if (id === "local") {
+			const vars = await this._runtime.getCurrentVariables();
 			vars.forEach((entry: {name: string, value: any}) => {
 				variables.push({
 					name: entry.name,
 					type: "integer",
 					value: entry.value.toString(),
+					variablesReference: 0
+				});
+			});
+		} else if (id === "global") {
+			const vars = await this._runtime.getGlobalVariables();
+			vars.forEach((entry: {name: string, value: any}) => {
+				variables.push({
+					name: entry.name,
+					type: "integer",
+					value: entry.value,
 					variablesReference: 0
 				});
 			});

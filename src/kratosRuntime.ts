@@ -104,6 +104,22 @@ export class KratosRuntime extends EventEmitter {
 		return vars;
 	}
 
+	public async getGlobalVariables() {
+		var promises: Array<Promise<{name: string, value: any}>> = [];
+		promises.push(new Promise((resolve, reject) => {
+			request.get(`http://${this._runtimeIP}:${this._runtimePort}/time`, (_, res, body) => {
+					if (res.statusCode === 200) {
+						resolve({name: "Time", value: body});
+					} else {
+						reject("Unknown value");
+					}
+				});
+		}));
+
+		var vars = await Promise.all(promises);
+		return vars;
+	}
+
 	private run(is_step: Boolean) {
 		if (this._connected) {
 			if (!is_step) {
