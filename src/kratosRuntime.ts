@@ -24,7 +24,9 @@ export class KratosRuntime extends EventEmitter {
 	private _breakpointId = 1;
 
 	private _current_breakpoint_id = -1;
-	private _current_variables = new Map<string, string>();
+	private _current_local_variables = new Map<string, string>();
+	private _current_generator_variables = new Map<string, string>();
+	private _current_self_variables = new Map<string, string>();
 
 	// need to pull this from configuration
 	private _runtimeIP = "0.0.0.0";
@@ -33,11 +35,15 @@ export class KratosRuntime extends EventEmitter {
 	private _connected = false;
 	private _app: express.Application;
 
-	private _step_filename: string;
-	private _step_line_num: number;
+	private _current_filename: string;
+	private _current_line_num: number;
 
-	public step_filename() { return this._step_filename; }
-	public step_line_num() { return this._step_line_num; }
+	public current_filename() { return this._current_filename; }
+	public current_num() { return this._current_line_num; }
+	public getCurrentLocalVariables() { return this._current_local_variables; }
+	public getCurrentGeneratorVariables() { return this._current_generator_variables; }
+	public getCurrentSelfVariables() { return this._current_self_variables; }
+
 
 	constructor() {
 		super();
@@ -46,12 +52,16 @@ export class KratosRuntime extends EventEmitter {
 	private on_breakpoint(req, res) {
 		// we will get a list of values
 		var payload: Array<string> = req.body;
-		var names: Object = payload["value"];
+		var local: Object = payload["local"];
+		var self: Object = payload["self"];
+		var generator: Object = payload["generator"];
 		var id = Number.parseInt(payload["id"]);
-		this._step_filename = payload["filename"];
-		this._step_line_num = Number.parseInt(payload["line_num"]);
+		this._current_filename = payload["filename"];
+		this._current_line_num = Number.parseInt(payload["line_num"]);
 		this._current_breakpoint_id = id;
-		this._current_variables = new Map<string, string>(Object.entries(names));
+		this._current_local_variables = new Map<string, string>(Object.entries(local));
+		this._current_self_variables = new Map<string, string>(Object.entries(self));
+		this._current_generator_variables = new Map<string, string>(Object.entries(generator));
 		this.fireEventsForBreakPoint(id);
 	}
 
@@ -82,26 +92,6 @@ export class KratosRuntime extends EventEmitter {
 		if (stopOnEntry) {
 			this.sendEvent('stopOnEntry');
 		}
-	}
-
-	public async getCurrentVariables() {
-		var promises: Array<Promise<{name: string, value: any}>> = [];
-		var getValue = (name: string, handle: string): Promise<{name: string, value: any}> => {
-			return new Promise((resolve, reject) => {
-				request.get(`http://${this._runtimeIP}:${this._runtimePort}/value/${handle}`, (_, res, body) => {
-					if (res.statusCode === 200) {
-						resolve({name: name, value: Number.parseInt(body)});
-					} else {
-						reject("Unknown value");
-					}
-				});
-			});
-		};
-		this._current_variables.forEach((handle: string, name: string) => {
-			promises.push(getValue(name, handle));
-		});
-		var vars: Array<{name: string, value: any}> = await Promise.all(promises);
-		return vars;
 	}
 
 	public async getGlobalVariables() {
@@ -178,7 +168,7 @@ export class KratosRuntime extends EventEmitter {
 				this._breakPoints.set(id, bp);
 				this.sendBreakpoint(id);
 			} else {
-				return vscode.window.showInformationMessage("Cannot set breakpoint");
+				return vscode.window.showErrorMessage(`Cannot set breakpoint at ${filename}:${line}`);
 			}
 		});
 
@@ -218,6 +208,8 @@ export class KratosRuntime extends EventEmitter {
 		request(options, (_, res, body) => {
 			if (res.statusCode === 200) {
 				fn(0);
+			} else {
+				return vscode.window.showErrorMessage(`Failed to get breakpoint at ${filename}:${line}`);
 			}
 		});
 	}
@@ -226,29 +218,14 @@ export class KratosRuntime extends EventEmitter {
 		// we only have one stack frame
 		var frames : Array<any> = [];
 		if (this._current_breakpoint_id >= 0) {
-			// it's been set
-			var bp = this._breakPoints.get(this._current_breakpoint_id);
-			if (bp) {
-				// get the filename and line number;
-				const filename = bp.filename;
-				const line_num = bp.line;
-				frames.push({
-					index: 0,
-					name: "Simulator Frame",
-					file: filename,
-					line: line_num
-				});
-			} else {
-				const filename = this.step_filename();
-				const line_num = this.step_line_num();
-				frames.push({
-					index: 0,
-					name: "Simulator Frame",
-					file: filename,
-					line: line_num
-				});
-
-			}
+			const filename = this.current_filename();
+			const line_num = this.current_num();
+			frames.push({
+				index: 0,
+				name: "Simulator Frame",
+				file: filename,
+				line: line_num
+			});
 		}
 		return {
 			frames: frames,
@@ -300,7 +277,7 @@ export class KratosRuntime extends EventEmitter {
 		};
 		request(options, (_, res, __) => {
 			if (res.statusCode !== 200) {
-
+				vscode.window.showErrorMessage("Failed to connect to a running simulator");
 			} else {
 				this._connected = true;
 				// request all the files and open them

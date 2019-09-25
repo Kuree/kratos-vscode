@@ -27,6 +27,9 @@ export class KratosDebugSession extends LoggingDebugSession {
 
 	private _variableHandles = new Handles<string>();
 
+	// self handle
+	private _selfHandle = this._variableHandles.create("self");
+
 	private _configurationDone = new Subject();
 
 	private _cancellationTokens = new Map<number, boolean>();
@@ -213,7 +216,8 @@ export class KratosDebugSession extends LoggingDebugSession {
 
 		response.body = {
 			scopes: [
-				new Scope("Generator Variables", this._variableHandles.create("local"), false),
+				new Scope("Local", this._variableHandles.create("local"), false),
+				new Scope("Generator Variables", this._variableHandles.create("generator"), false),
 				new Scope("Simulator Values", this._variableHandles.create("global"), true)
 			]
 		};
@@ -228,14 +232,21 @@ export class KratosDebugSession extends LoggingDebugSession {
 
 		// 0 is local
 		if (id === "local") {
-			const vars = await this._runtime.getCurrentVariables();
-			vars.forEach((entry: {name: string, value: any}) => {
+			const vars = this._runtime.getCurrentLocalVariables();
+			vars.forEach((value: string, name: string) => {
 				variables.push({
-					name: entry.name,
+					name: name,
 					type: "integer",
-					value: entry.value.toString(),
+					value: value,
 					variablesReference: 0
 				});
+			});
+			// notice that we nested self into it
+			variables.push({
+				name: "self",
+				type: "object",
+				value: "Object",
+				variablesReference: this._selfHandle
 			});
 		} else if (id === "global") {
 			const vars = await this._runtime.getGlobalVariables();
@@ -244,6 +255,26 @@ export class KratosDebugSession extends LoggingDebugSession {
 					name: entry.name,
 					type: "integer",
 					value: entry.value,
+					variablesReference: 0
+				});
+			});
+		} else if (id === "self") {
+			const vars = this._runtime.getCurrentSelfVariables();
+			vars.forEach((value: string, name: string) => {
+				variables.push({
+					name: name,
+					type: "integer",
+					value: value,
+					variablesReference: 0
+				});
+			});
+		} else if (id === "generator") {
+			const vars = this._runtime.getCurrentGeneratorVariables();
+			vars.forEach((value: string, name: string) => {
+				variables.push({
+					name: name,
+					type: "integer",
+					value: value,
 					variablesReference: 0
 				});
 			});
