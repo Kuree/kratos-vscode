@@ -2,9 +2,14 @@
   "name": "kratos-vscode",
   "displayName": "kratos-vscode",
   "description": "Debugger for kratos generators",
+  "publisher": "keyiz",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.33.0"
+  },
+  "repository": {
+		"type": "git",
+		"url": "https://github.com/Kuree/kratos-vscode.git"
   },
   "categories": [
     "Debuggers"
@@ -87,7 +92,7 @@
     "@types/glob": "^7.1.1",
     "@types/mocha": "^5.2.6",
     "@types/node": "^10.12.21",
-    "@types/vscode": "^1.38.0",
+    "@types/vscode": "^1.33.0",
     "glob": "^7.1.4",
     "mocha": "^6.1.4",
     "typescript": "^3.3.1",

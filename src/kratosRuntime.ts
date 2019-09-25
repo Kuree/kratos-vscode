@@ -95,15 +95,15 @@ export class KratosRuntime extends EventEmitter {
 	}
 
 	public async getGlobalVariables() {
-		var promises: Array<Promise<{name: string, value: any}>> = [];
+		var promises: Array<Promise<{ name: string, value: any }>> = [];
 		promises.push(new Promise((resolve, reject) => {
 			request.get(`http://${this._runtimeIP}:${this._runtimePort}/time`, (_, res, body) => {
-					if (res.statusCode === 200) {
-						resolve({name: "Time", value: body});
-					} else {
-						reject("Unknown value");
-					}
-				});
+				if (res.statusCode === 200) {
+					resolve({ name: "Time", value: body });
+				} else {
+					reject("Unknown value");
+				}
+			});
 		}));
 
 		var vars = await Promise.all(promises);
@@ -216,7 +216,7 @@ export class KratosRuntime extends EventEmitter {
 
 	public stack() {
 		// we only have one stack frame
-		var frames : Array<any> = [];
+		var frames: Array<any> = [];
 		if (this._current_breakpoint_id >= 0) {
 			const filename = this.current_filename();
 			const line_num = this.current_num();
@@ -253,15 +253,8 @@ export class KratosRuntime extends EventEmitter {
 	}
 
 	private sendRemoveBreakpoints(filename: string) {
-		var payload = { filename: filename };
-		var url = `http://${this._runtimeIP}:${this._runtimePort}/breakpoint/file`;
-		var options = {
-			method: "delete",
-			body: payload,
-			json: true,
-			url: url
-		};
-		request(options);
+		var url = `http://${this._runtimeIP}:${this._runtimePort}/breakpoint/file/${filename}`;
+		request.delete(url);
 	}
 
 	private connectRuntime(file: string) {
@@ -289,7 +282,7 @@ export class KratosRuntime extends EventEmitter {
 						var base_dir = path.dirname(file);
 						if (!opened_dirs.has(base_dir)) {
 							vscode.workspace.updateWorkspaceFolders(vscode.workspace.workspaceFolders ?
-								vscode.workspace.workspaceFolders.length : 0, null, { uri: vscode.Uri.file(base_dir)});
+								vscode.workspace.workspaceFolders.length : 0, null, { uri: vscode.Uri.file(base_dir) });
 							opened_dirs.add(base_dir);
 						}
 						var res = vscode.workspace.openTextDocument(vscode.Uri.file(file));
