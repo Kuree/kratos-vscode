@@ -51,6 +51,16 @@
                 "type": "boolean",
                 "description": "Enable logging of the Debug Adapter Protocol.",
                 "default": true
+              },
+              "runtimeIP": {
+                "type": "string",
+                "description": "IP address of the machine that's running simulation",
+                "default": "0.0.0.0"
+              },
+              "runtimePort": {
+                "type": "number",
+                "description": "Port number of the machine that's running simulation",
+                "default": 8888
               }
             }
           }
@@ -61,7 +71,9 @@
             "request": "launch",
             "name": "Ask for debug file",
             "program": "${workspaceFolder}/${command:AskForProgramName}",
-            "stopOnEntry": true
+            "stopOnEntry": true,
+            "runtimeIP": "0.0.0.0",
+            "runtimePort": 8888
           }
         ],
         "configurationSnippets": [
@@ -73,7 +85,9 @@
               "request": "launch",
               "name": "Ask for debug file",
               "program": "^\"\\${workspaceFolder}/\\${command:AskForProgramName}\"",
-              "stopOnEntry": true
+              "stopOnEntry": true,
+              "runtimeIP": "0.0.0.0",
+              "runtimePort": 8888
             }
           }
         ],
