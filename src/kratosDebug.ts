@@ -12,6 +12,9 @@ const { Subject } = require('await-notify');
 interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArguments {
 	/** An absolute path to the "program" to debug. */
 	program: string;
+	/* runtime IP */
+	runtimeIP :string;
+	runtimePort: number;
 	/** Automatically stop target after launch. If not specified, target does not stop. */
 	stopOnEntry?: boolean;
 	/** enable logging the Debug Adapter Protocol */
@@ -139,6 +142,10 @@ export class KratosDebugSession extends LoggingDebugSession {
 
 		// wait until configuration has finished (and configurationDoneRequest has been called)
 		await this._configurationDone.wait(1000);
+		
+		// set the runtime configuration
+		this._runtime.setRuntimeIP(args.runtimeIP);
+		this._runtime.setRuntimePort(args.runtimePort);
 
 		// start the program in the runtime
 		this._runtime.start(args.program, !!args.stopOnEntry);
@@ -146,13 +153,13 @@ export class KratosDebugSession extends LoggingDebugSession {
 		this.sendResponse(response);
 	}
 
-	protected setBreakPointsRequest(response: DebugProtocol.SetBreakpointsResponse, args: DebugProtocol.SetBreakpointsArguments): void {
+	protected async setBreakPointsRequest(response: DebugProtocol.SetBreakpointsResponse, args: DebugProtocol.SetBreakpointsArguments) {
 
 		const path = <string>args.source.path;
 		const clientLines = args.lines || [];
 
 		// clear all breakpoints for this file
-		this._runtime.clearBreakpoints(path);
+		await this._runtime.clearBreakpoints(path);
 
 		// set and verify breakpoint locations
 		const actualBreakpoints = clientLines.map(l => {

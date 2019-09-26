@@ -39,12 +39,23 @@ class KratosConfigurationProvider implements vscode.DebugConfigurationProvider {
 	 */
 	async resolveDebugConfiguration(folder: WorkspaceFolder | undefined, config: DebugConfiguration, token?: CancellationToken): Promise<ProviderResult<DebugConfiguration>> {
 
-		// if launch.json is missing or empty
-		if (!config.type && !config.request && !config.name) {
+		// if launch.json is missing or empty or missing entries
+		if (!config.type) {
 			config.type = 'kratos';
+		}
+		if (!config.name) {
 			config.name = 'Launch';
+		}
+		if (!config.request) {
 			config.request = 'launch';
-			// config.program = '${file}';
+		}
+		if (!config.runtimeIP) {
+			config.runtimeIP = "0.0.0.0";
+		}
+		if (!config.runtimePort) {
+			config.runtimePort = 8888;
+		}
+		if (!config.stopOnEntry) {
 			config.stopOnEntry = true;
 		}
 		var promise: Array<Promise<string>> = [];

@@ -5,6 +5,8 @@ import * as request from 'request';
 import * as express from 'express';
 import * as http from 'http';
 import * as bodyParser from 'body-parser';
+import * as utils from './utils';
+
 
 export interface KratosBreakpoint {
 	id: number;
@@ -44,6 +46,9 @@ export class KratosRuntime extends EventEmitter {
 	public getCurrentGeneratorVariables() { return this._current_generator_variables; }
 	public getCurrentSelfVariables() { return this._current_self_variables; }
 
+	public setRuntimeIP(ip: string) { this._runtimeIP = ip; }
+	public setRuntimePort(port: number) { this._runtimePort = port; }
+
 
 	constructor() {
 		super();
@@ -68,7 +73,7 @@ export class KratosRuntime extends EventEmitter {
 	/**
 	 * Start executing the given program.
 	 */
-	public start(program: string, stopOnEntry: boolean) {
+	public async start(program: string, stopOnEntry: boolean) {
 		// setup the local server
 		this._app = express();
 		this._app.use(bodyParser.json());
@@ -80,7 +85,8 @@ export class KratosRuntime extends EventEmitter {
 			this.on_breakpoint(req, res);
 		});
 
-		var server = http.createServer(this._app).listen(this._debuggerPort, this._runtimeIP);
+		const ip = await utils.get_ip();
+		var server = http.createServer(this._app).listen(this._debuggerPort, ip);
 
 		this._app.post("/stop", (_, __) => {
 			server.close();
@@ -190,10 +196,10 @@ export class KratosRuntime extends EventEmitter {
 	/*
 	 * Clear all breakpoints for file.
 	 */
-	public clearBreakpoints(filename: string): void {
+	public async clearBreakpoints(filename: string) {
 		// find the filename
 		var filename = path.resolve(filename);
-		this.sendRemoveBreakpoints(filename);
+		await this.sendRemoveBreakpoints(filename);
 	}
 
 	public getBreakpoints(filename: string, line: number, fn: (id: number) => void) {
@@ -252,15 +258,18 @@ export class KratosRuntime extends EventEmitter {
 		request(options);
 	}
 
-	private sendRemoveBreakpoints(filename: string) {
+	private async sendRemoveBreakpoints(filename: string) {
 		var url = `http://${this._runtimeIP}:${this._runtimePort}/breakpoint/file/${filename}`;
-		request.delete(url);
+		return new Promise<void>((resolve, _) => {request.delete(url, () => {
+			resolve();
+		});});
 	}
 
-	private connectRuntime(file: string) {
+	private async connectRuntime(file: string) {
 		// resolve it to make it absolute path
 		file = path.resolve(file);
-		var payload = { ip: this._runtimeIP, port: this._debuggerPort, database: file };
+		const ip = await utils.get_ip();
+		var payload = { ip: ip, port: this._debuggerPort, database: file };
 		var url = `http://${this._runtimeIP}:${this._runtimePort}/connect`;
 		var options = {
 			method: "post",

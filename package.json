@@ -8,8 +8,8 @@
     "vscode": "^1.33.0"
   },
   "repository": {
-		"type": "git",
-		"url": "https://github.com/Kuree/kratos-vscode.git"
+    "type": "git",
+    "url": "https://github.com/Kuree/kratos-vscode.git"
   },
   "categories": [
     "Debuggers"
@@ -102,9 +102,11 @@
   },
   "dependencies": {
     "@types/express": "^4.17.1",
+    "@types/internal-ip": "^4.1.0",
     "@types/request": "^2.48.3",
     "await-notify": "^1.0.1",
     "express": "^4.17.1",
+    "internal-ip": "^4.3.0",
     "request": "^2.88.0",
     "sync-request": "^6.1.0",
     "vscode-debugadapter": "^1.37.1",
