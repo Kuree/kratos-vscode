@@ -98,6 +98,9 @@ export class KratosDebugSession extends LoggingDebugSession {
 		// make VS Code to use 'evaluate' when hovering over source
 		response.body.supportsEvaluateForHovers = true;
 
+		// we support conditional breakpoints
+		response.body.supportsConditionalBreakpoints = true;
+
 		// make VS Code to show a 'step back' button
 		response.body.supportsStepBack = false;
 
@@ -291,6 +294,9 @@ export class KratosDebugSession extends LoggingDebugSession {
 			variables: variables
 		};
 		this.sendResponse(response);
+	}
+
+	protected evaluateRequest( response:DebugProtocol.EvaluateResponse, args:DebugProtocol.EvaluateArguments ): void {
 	}
 
 	protected continueRequest(response: DebugProtocol.ContinueResponse, args: DebugProtocol.ContinueArguments): void {
