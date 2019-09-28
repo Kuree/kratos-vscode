@@ -159,14 +159,14 @@ export class KratosDebugSession extends LoggingDebugSession {
 	protected async setBreakPointsRequest(response: DebugProtocol.SetBreakpointsResponse, args: DebugProtocol.SetBreakpointsArguments) {
 
 		const path = <string>args.source.path;
-		const clientLines = args.lines || [];
+		const breakpoints = args.breakpoints || [];
 
 		// clear all breakpoints for this file
 		await this._runtime.clearBreakpoints(path);
 
 		// set and verify breakpoint locations
-		const actualBreakpoints = clientLines.map(l => {
-			const kratos_bp = this._runtime.setBreakPoint(path, this.convertClientLineToDebugger(l));
+		const actualBreakpoints = breakpoints.map(l => {
+			const kratos_bp = this._runtime.setBreakPoint(path, this.convertClientLineToDebugger(l.line), l.condition);
 			const bp = <DebugProtocol.Breakpoint> new Breakpoint(kratos_bp.valid, this.convertDebuggerLineToClient(kratos_bp.line));
 			bp.id= kratos_bp.id;
 			return bp;

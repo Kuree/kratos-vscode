@@ -153,12 +153,16 @@ export class KratosRuntime extends EventEmitter {
 	/*
 	 * Set breakpoint in file with given line.
 	 */
-	public setBreakPoint(filename: string, line: number): KratosBreakpoint {
+	public setBreakPoint(filename: string, line: number, expr?: string): KratosBreakpoint {
 		// get the absolute path
 		var filename = path.resolve(filename);
 		var bp = <KratosBreakpoint>{ valid: false, line, id: this._breakpointId++, filename: filename };
 
-		var payload = { filename: filename, line_num: line };
+		if (!expr) {
+			expr = "";
+		}
+
+		var payload = { filename: filename, line_num: line, expr: expr };
 		var url = `http://${this._runtimeIP}:${this._runtimePort}/breakpoint`;
 		var options = {
 			method: "post",
