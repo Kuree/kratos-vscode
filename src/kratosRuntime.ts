@@ -6,6 +6,7 @@ import * as express from 'express';
 import * as http from 'http';
 import * as bodyParser from 'body-parser';
 import * as utils from './utils';
+import { AddressInfo } from 'net';
 
 
 export interface KratosBreakpoint {
@@ -33,7 +34,7 @@ export class KratosRuntime extends EventEmitter {
 	// need to pull this from configuration
 	private _runtimeIP = "0.0.0.0";
 	private _runtimePort = 8888;
-	private _debuggerPort = 8889;
+	private _debuggerPort: number = 8889;
 	private _connected = false;
 	private _app: express.Application;
 
@@ -86,18 +87,25 @@ export class KratosRuntime extends EventEmitter {
 		});
 
 		const ip = await utils.get_ip();
-		var server = http.createServer(this._app).listen(this._debuggerPort, ip);
+		var server = http.createServer(this._app);
+		server.listen(undefined, ip, () => {
+
+			const address: any = server.address();
+			this._debuggerPort = address.port;
+
+			// connect to the server
+			this.connectRuntime(program);
+			if (stopOnEntry) {
+				this.sendEvent('stopOnEntry');
+			}
+		});
 
 		this._app.post("/stop", (_, __) => {
 			server.close();
 			this.sendEvent('end');
 		});
 
-		// connect to the server
-		this.connectRuntime(program);
-		if (stopOnEntry) {
-			this.sendEvent('stopOnEntry');
-		}
+
 	}
 
 	public async getGlobalVariables() {
