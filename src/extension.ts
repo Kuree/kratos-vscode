@@ -5,6 +5,7 @@ import { WorkspaceFolder, DebugConfiguration, ProviderResult, CancellationToken 
 import { KratosDebugSession } from './kratosDebug';
 import * as Net from 'net';
 import * as path from 'path';
+import { ModuleViewPanel} from './moduleView';
 
 export function activate(context: vscode.ExtensionContext) {
 
@@ -24,6 +25,23 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(vscode.debug.registerDebugAdapterDescriptorFactory('kratos', factory));
 	context.subscriptions.push(factory);
 	
+	// this is for module viewer
+	context.subscriptions.push(
+		vscode.commands.registerCommand('kratosView.start', () => {
+			ModuleViewPanel.createOrShow(context.extensionPath);
+		})
+	);
+
+
+	if (vscode.window.registerWebviewPanelSerializer) {
+		// Make sure we register a serializer in activation event
+		vscode.window.registerWebviewPanelSerializer(ModuleViewPanel.viewType, {
+			async deserializeWebviewPanel(webviewPanel: vscode.WebviewPanel, state: any) {
+				console.log(`Got state: ${state}`);
+				ModuleViewPanel.revive(webviewPanel, context.extensionPath);
+			}
+		});
+	}
 }
 
 export function deactivate() {

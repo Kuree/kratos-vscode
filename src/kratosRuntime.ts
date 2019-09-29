@@ -6,7 +6,6 @@ import * as express from 'express';
 import * as http from 'http';
 import * as bodyParser from 'body-parser';
 import * as utils from './utils';
-import { AddressInfo } from 'net';
 
 
 export interface KratosBreakpoint {

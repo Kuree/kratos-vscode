@@ -95,6 +95,13 @@
           "AskForProgramName": "extension.kratos-debug.getProgramName"
         }
       }
+    ],
+    "commands": [
+      {
+        "command": "kratosView.start",
+        "title": "Start Kratos module view",
+        "category": "Kratos"
+      }
     ]
   },
   "scripts": {
