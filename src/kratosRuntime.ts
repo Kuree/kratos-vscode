@@ -104,8 +104,10 @@ export class KratosRuntime extends EventEmitter {
 			server.close();
 			this.sendEvent('end');
 		});
+	}
 
-
+	public async stop() {
+		request.post(`http://${this._runtimeIP}:${this._runtimePort}/stop`);
 	}
 
 	public async getGlobalVariables() {

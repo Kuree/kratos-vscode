@@ -119,6 +119,9 @@ export class KratosDebugSession extends LoggingDebugSession {
 		// make VS Code send the breakpointLocations request
 		response.body.supportsBreakpointLocationsRequest = true;
 
+		// support terminate request
+		response.body.supportsTerminateRequest = true;
+
 		this.sendResponse(response);
 
 		// since this debug adapter can accept configuration requests like 'setBreakpoint' at any time,
@@ -313,6 +316,11 @@ export class KratosDebugSession extends LoggingDebugSession {
 		if (args.requestId) {
 			this._cancellationTokens.set(args.requestId, true);
 		}
+	}
+
+	protected async terminateRequest(response: DebugProtocol.TerminateResponse, args: DebugProtocol.TerminateArguments, request?: DebugProtocol.Request) {
+		await this._runtime.stop();
+		this.sendResponse(response);
 	}
 
 	//---- helpers
