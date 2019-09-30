@@ -1,16 +1,18 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
+import * as format from 'string-template';
+import * as fs from 'fs';
 
 /**
  * This class controls the webview panel that will be used for monitoring
  */
- export class ModuleViewPanel {
-	 // the code is based on https://github.com/microsoft/vscode-extension-samples/blob/master/webview-sample/
+export class ModuleViewPanel {
+	// the code is based on https://github.com/microsoft/vscode-extension-samples/blob/master/webview-sample/
 	public static currentPanel: ModuleViewPanel | undefined;
 
 	public static readonly viewType = "kratosModuleView";
 	private readonly _panel: vscode.WebviewPanel;
-	// private readonly _extensionPath: string;
+	private readonly _extensionPath: string;
 	private _disposables: vscode.Disposable[] = [];
 
 	public static createOrShow(extensionPath: string) {
@@ -43,7 +45,7 @@ import * as path from 'path';
 
 	private constructor(panel: vscode.WebviewPanel, extensionPath: string) {
 		this._panel = panel;
-		// this._extensionPath = extensionPath;
+		this._extensionPath = extensionPath;
 
 		// Set the webview's initial html content
 		this._update();
@@ -95,13 +97,33 @@ import * as path from 'path';
 		ModuleViewPanel.currentPanel = new ModuleViewPanel(panel, extensionPath);
 	}
 
-	private _update() {
+	private async _update() {
 		const webview = this._panel.webview;
 		this._panel.title = "Kratos Module Viewer";
-		webview.html = this._getHtmlForWebview(webview);
+		webview.html = await this._getHtmlForWebview(webview);
 	}
 
-	private _getHtmlForWebview(webview: vscode.Webview) {
-		return "hello";
+	private async _getHtmlForWebview(webview: vscode.Webview) {
+		// Local path to main script run in the webview
+		const mediaDir = path.join(this._extensionPath, 'media');
+		const scriptPathOnDisk = vscode.Uri.file(path.join(mediaDir, 'main.js'));
+		const htmlOnDisk = vscode.Uri.file(path.join(mediaDir, 'main.html'));
+
+		const scriptUri = webview.asWebviewUri(scriptPathOnDisk);
+		const nonce = getNonce();
+
+		const content: string = fs.readFileSync(htmlOnDisk.fsPath, 'utf-8');
+		const html = format(content, {nonce: nonce, scriptUri: scriptUri});
+		
+		return html;
 	}
- }
+}
+
+function getNonce() {
+	let text = '';
+	const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+	for (let i = 0; i < 32; i++) {
+		text += possible.charAt(Math.floor(Math.random() * possible.length));
+	}
+	return text;
+}
