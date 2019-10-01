@@ -58,32 +58,31 @@ export class ModuleViewPanel {
 		// This happens when the user closes the panel or when the panel is closed programatically
 		this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
 
-		// Update the content based on view changes
-		this._panel.onDidChangeViewState(
-			e => {
-				if (this._panel.visible) {
-					this._update();
-				}
-			},
-			null,
-			this._disposables
-		);
-
 		// Handle messages from the webview
 		this._panel.webview.onDidReceiveMessage(
 			async message => {
 				switch (message.command) {
-					case 'hierarchy':
+					case 'hierarchy': {
 						const name = message.value;
 						const hierarchy = await ModuleViewPanel.runtime.getHierarchy(name);
 						// send it back
 						this._panel.webview.postMessage({command: "hierarchy", value: hierarchy});
 						return;
-					case 'connection':
+					}
+					case 'connection-to': {
 						const handle = message.value;
-						const connection = await ModuleViewPanel.runtime.getConnection(handle);
+						const connection = await ModuleViewPanel.runtime.getConnectionTo(handle);
 						// send it back
-						this._panel.webview.postMessage({command: "connection", value: connection});
+						this._panel.webview.postMessage({command: "connection-to", value: connection});
+						return;
+					}
+					case 'connection-from': {
+						const handle = message.value;
+						const connection = await ModuleViewPanel.runtime.getConnectionFrom(handle);
+						// send it back
+						this._panel.webview.postMessage({command: "connection-from", value: connection});
+						return;
+					}
 				}
 			},
 			null,

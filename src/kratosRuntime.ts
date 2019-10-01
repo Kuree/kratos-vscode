@@ -267,8 +267,21 @@ export class KratosRuntime extends EventEmitter {
 	}
 
 	// get connections
-	public getConnection(handle: string) {
-		var url = `http://${this._runtimeIP}:${this._runtimePort}/connection/${handle}`;
+	public getConnectionTo(handle: string) {
+		var url = `http://${this._runtimeIP}:${this._runtimePort}/connection/to/${handle}`;
+		return new Promise((resolve, reject) => {
+			request.get(url, (_, res, __) => {
+				if (res.statusCode === 200) {
+					resolve(res.body);
+				} else {
+					reject();
+				}
+			});
+		});
+	}
+
+	public getConnectionFrom(handle: string) {
+		var url = `http://${this._runtimeIP}:${this._runtimePort}/connection/from/${handle}`;
 		return new Promise((resolve, reject) => {
 			request.get(url, (_, res, __) => {
 				if (res.statusCode === 200) {
