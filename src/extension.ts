@@ -7,6 +7,7 @@ import * as Net from 'net';
 import * as path from 'path';
 import { ModuleViewPanel} from './moduleView';
 
+
 export function activate(context: vscode.ExtensionContext) {
 
 	context.subscriptions.push(vscode.commands.registerCommand('extension.kratos-debug.getProgramName', config => {
@@ -28,7 +29,7 @@ export function activate(context: vscode.ExtensionContext) {
 	// this is for module viewer
 	context.subscriptions.push(
 		vscode.commands.registerCommand('kratosView.start', () => {
-			ModuleViewPanel.createOrShow(context.extensionPath);
+			ModuleViewPanel.createOrShow(context.extensionPath, factory.session);
 		})
 	);
 
@@ -116,6 +117,7 @@ class KratosConfigurationProvider implements vscode.DebugConfigurationProvider {
 class KratosDebugAdapterDescriptorFactory implements vscode.DebugAdapterDescriptorFactory {
 
 	private server?: Net.Server;
+	public session: KratosDebugSession;
 
 	createDebugAdapterDescriptor(session: vscode.DebugSession, executable: vscode.DebugAdapterExecutable | undefined): vscode.ProviderResult<vscode.DebugAdapterDescriptor> {
 
@@ -123,6 +125,7 @@ class KratosDebugAdapterDescriptorFactory implements vscode.DebugAdapterDescript
 			// start listening on a random port
 			this.server = Net.createServer(socket => {
 				const session = new KratosDebugSession();
+				this.session = session;
 				session.setRunAsServer(true);
 				session.start(<NodeJS.ReadableStream>socket, socket);
 			}).listen(0);

@@ -2,6 +2,8 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as format from 'string-template';
 import * as fs from 'fs';
+import {KratosDebugSession} from './kratosDebug';
+import {KratosRuntime} from './kratosRuntime';
 
 /**
  * This class controls the webview panel that will be used for monitoring
@@ -14,8 +16,9 @@ export class ModuleViewPanel {
 	private readonly _panel: vscode.WebviewPanel;
 	private readonly _extensionPath: string;
 	private _disposables: vscode.Disposable[] = [];
+	private static runtime: KratosRuntime;
 
-	public static createOrShow(extensionPath: string) {
+	public static createOrShow(extensionPath: string, session: KratosDebugSession) {
 		const column = vscode.window.activeTextEditor
 			? vscode.window.activeTextEditor.viewColumn
 			: undefined;
@@ -41,6 +44,7 @@ export class ModuleViewPanel {
 		);
 
 		ModuleViewPanel.currentPanel = new ModuleViewPanel(panel, extensionPath);
+		ModuleViewPanel.runtime = session.runtime();
 	}
 
 	private constructor(panel: vscode.WebviewPanel, extensionPath: string) {
@@ -67,11 +71,19 @@ export class ModuleViewPanel {
 
 		// Handle messages from the webview
 		this._panel.webview.onDidReceiveMessage(
-			message => {
+			async message => {
 				switch (message.command) {
-					case 'alert':
-						vscode.window.showErrorMessage(message.text);
+					case 'hierarchy':
+						const name = message.value;
+						const hierarchy = await ModuleViewPanel.runtime.getHierarchy(name);
+						// send it back
+						this._panel.webview.postMessage({command: "hierarchy", value: hierarchy});
 						return;
+					case 'connection':
+						const handle = message.value;
+						const connection = await ModuleViewPanel.runtime.getConnection(handle);
+						// send it back
+						this._panel.webview.postMessage({command: "connection", value: connection});
 				}
 			},
 			null,

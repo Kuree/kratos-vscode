@@ -252,6 +252,34 @@ export class KratosRuntime extends EventEmitter {
 		};
 	}
 
+	// get hierarchy
+	public getHierarchy(handle: string) {
+		var url = `http://${this._runtimeIP}:${this._runtimePort}/hierarchy/${handle}`;
+		return new Promise((resolve, reject) => {
+			request.get(url, (_, res, __) => {
+				if (res.statusCode === 200) {
+					resolve(res.body);
+				} else {
+					reject();
+				}
+			});
+		});
+	}
+
+	// get connections
+	public getConnection(handle: string) {
+		var url = `http://${this._runtimeIP}:${this._runtimePort}/connection/${handle}`;
+		return new Promise((resolve, reject) => {
+			request.get(url, (_, res, __) => {
+				if (res.statusCode === 200) {
+					resolve(res.body);
+				} else {
+					reject();
+				}
+			});
+		});
+	}
+
 	// private methods
 
 	private sendBreakpoint(break_id: number) {

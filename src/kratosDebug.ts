@@ -27,6 +27,7 @@ export class KratosDebugSession extends LoggingDebugSession {
 	private static THREAD_ID = 1;
 
 	private _runtime: KratosRuntime;
+	public runtime(): KratosRuntime { return this._runtime; }
 
 	private _variableHandles = new Handles<string>();
 
