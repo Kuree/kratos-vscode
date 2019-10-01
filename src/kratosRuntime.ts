@@ -293,6 +293,11 @@ export class KratosRuntime extends EventEmitter {
 		});
 	}
 
+	public monitorHandle(handle: string) {
+		var url = `http://${this._runtimeIP}:${this._runtimePort}/monitor/${handle}`;
+		request.post(url);
+	}
+
 	// private methods
 
 	private sendBreakpoint(break_id: number) {

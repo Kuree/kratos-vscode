@@ -37,7 +37,7 @@ export class ModuleViewPanel {
 			{
 				// Enable javascript in the webview
 				enableScripts: true,
-
+				retainContextWhenHidden: true,
 				// And restrict the webview to only loading content from our extension's `media` directory.
 				localResourceRoots: [vscode.Uri.file(path.join(extensionPath, 'media'))]
 			}
@@ -82,6 +82,11 @@ export class ModuleViewPanel {
 						// send it back
 						this._panel.webview.postMessage({command: "connection-from", value: connection});
 						return;
+					}
+					case 'monitor-connection': {
+						const handle = message.value;
+						// tell the runtime to monitor this handle value
+						ModuleViewPanel.runtime.monitorHandle(handle);
 					}
 				}
 			},
