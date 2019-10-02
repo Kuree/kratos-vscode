@@ -3,6 +3,9 @@
 window.onload = () => {
     const vscode = acquireVsCodeApi();
 
+    // styling
+    const fontColor = getComputedStyle(document.documentElement).getPropertyValue('--vscode-editor-foreground');
+
     // const oldState = vscode.getState();
     var nodes = new vis.DataSet([]);
     var edges = new vis.DataSet([]);
@@ -38,7 +41,7 @@ window.onload = () => {
                     const splits = handle_name.split(".");
                     nodes.add({
                         id: node_id, label: splits[splits.length - 1], title: handle_name,
-                        value: 30
+                        shape: 'box'
                     });
                 });
 
@@ -73,7 +76,10 @@ window.onload = () => {
                                 arrows: "to",
                                 label: label,
                                 var: `${handle_from}.${var_from}`,
-                                id: edges_set.length
+                                id: edges_set.length,
+                                font: {
+                                    color: fontColor, strokeWidth: 0
+                                }
                             };
                             edges.add(edge);
                             new_edges.push(edge);
@@ -129,13 +135,13 @@ window.onload = () => {
     }
 
     function monitor_edge(handle_name, edge) {
-        vscode.postMessage({command: "add-monitor", value: handle_name});
+        vscode.postMessage({ command: "add-monitor", value: handle_name });
         handle_edge.set(handle_name, edge);
     }
 
     function remove_monitors() {
         handle_edge.forEach((_, handle, __) => {
-            vscode.postMessage({command: "remove-monitor", value: handle});
+            vscode.postMessage({ command: "remove-monitor", value: handle });
         })
         handle_edge.clear();
         handle_label.clear();
