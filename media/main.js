@@ -7,7 +7,11 @@ window.onload = () => {
     var nodes = new vis.DataSet([]);
     var edges = new vis.DataSet([]);
     var handle_map = new Map();
+    var id_to_handle = new Map();
     var edges_set = new Set();
+    var edges_map = new Map();
+    var handle_edge = new Map();
+    var handle_label = new Map();
 
     // Handle messages sent from the extension to the webview
     window.addEventListener('message', event => {
@@ -17,16 +21,19 @@ window.onload = () => {
                 const hierarchy = JSON.parse(message.value);
                 nodes.clear();
                 handle_map.clear();
+                id_to_handle.clear();
                 edges.clear();
                 edges_set.clear();
+                remove_monitors();
 
                 hierarchy.forEach(handle_name => {
                     let node_id = 0;
-                    if (handle_map.has(handle_map)) {
+                    if (handle_map.has(handle_name)) {
                         node_id = handle_map.get(handle_name);
                     } else {
                         node_id = handle_map.size;
                         handle_map.set(handle_name, node_id);
+                        id_to_handle.set(node_id, handle_name);
                     }
                     const splits = handle_name.split(".");
                     nodes.add({
@@ -44,6 +51,7 @@ window.onload = () => {
             case 'connection-to':
             case 'connection-from': {
                 const connection = JSON.parse(message.value);
+                var new_edges = [];
                 connection.forEach(conn => {
                     const handle_from = conn.handle_from;
                     const handle_to = conn.handle_to;
@@ -59,17 +67,51 @@ window.onload = () => {
                         const key = `${handle_from}.${var_from} -> ${handle_to}.${var_to}`;
                         if (!edges_set.has(key)) {
                             // add an edge
-                            edges.add({
+                            const edge = {
                                 from: handle_map.get(handle_from),
                                 to: handle_map.get(handle_to),
                                 arrows: "to",
-                                label: label
-                            })
+                                label: label,
+                                var: `${handle_from}.${var_from}`,
+                                id: edges_set.length
+                            };
+                            edges.add(edge);
+                            new_edges.push(edge);
                             edges_set.add(key);
+                            edges_map.set(edge.var, edge)
                         }
 
                     }
                 });
+                // we need to send monitor to connected edges
+                console.log(new_edges);
+                console.log(new_edges.length);
+                new_edges.forEach((edge, _, __) => {
+                    // we only need the from one since it's wired together
+                    const handle = edge.var;
+                    monitor_edge(handle, edge);
+                    handle_label.set(handle, edge.label);
+                })
+                break;
+            }
+            case 'value': {
+                // monitored value
+                const value = message.value;
+                var handle = value.handle;
+                const v = value.value;
+                // find the edge handle
+                // FIXME: use the top name from the webview
+                if (handle.indexOf("TOP.") === 0) {
+                    handle = handle.replace("TOP.", "");
+                }
+                const edge = edges_map.get(handle);
+                if (edge) {
+                    var label = handle_label.get(handle);
+                    label += "\n" + v;
+                    edge.label = label;
+                    edges.update(edge);
+                }
+                break;
             }
         }
     });
@@ -84,6 +126,19 @@ window.onload = () => {
 
     function get_connection_from(handle_name) {
         vscode.postMessage({ command: "connection-from", value: handle_name });
+    }
+
+    function monitor_edge(handle_name, edge) {
+        vscode.postMessage({command: "add-monitor", value: handle_name});
+        handle_edge.set(handle_name, edge);
+    }
+
+    function remove_monitors() {
+        handle_edge.forEach((_, handle, __) => {
+            vscode.postMessage({command: "remove-monitor", value: handle});
+        })
+        handle_edge.clear();
+        handle_label.clear();
     }
 
     // create a network

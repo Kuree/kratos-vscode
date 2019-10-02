@@ -40,6 +40,10 @@ export class KratosRuntime extends EventEmitter {
 	private _current_filename: string;
 	private _current_line_num: number;
 
+	// callback for the module view
+	private _onValueChange?: CallableFunction;
+	public setOnValueChange(callback: CallableFunction) { this._onValueChange = callback; }
+
 	public current_filename() { return this._current_filename; }
 	public current_num() { return this._current_line_num; }
 	public getCurrentLocalVariables() { return this._current_local_variables; }
@@ -83,6 +87,14 @@ export class KratosRuntime extends EventEmitter {
 
 		this._app.post("/status/step", (req, res) => {
 			this.on_breakpoint(req, res);
+		});
+
+		this._app.post("/value", (req, res) => {
+			const handle = req.body.handle;
+			const value = req.body.value;
+			if (handle && value && (typeof this._onValueChange !== 'undefined')) {
+				this._onValueChange(handle, value);
+			}
 		});
 
 		const ip = await utils.get_ip();
@@ -296,6 +308,11 @@ export class KratosRuntime extends EventEmitter {
 	public monitorHandle(handle: string) {
 		var url = `http://${this._runtimeIP}:${this._runtimePort}/monitor/${handle}`;
 		request.post(url);
+	}
+
+	public deleteMonitorHandle(handle: string) {
+		var url = `http://${this._runtimeIP}:${this._runtimePort}/monitor/${handle}`;
+		request.delete(url);
 	}
 
 	// private methods

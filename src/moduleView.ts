@@ -43,8 +43,8 @@ export class ModuleViewPanel {
 			}
 		);
 
-		ModuleViewPanel.currentPanel = new ModuleViewPanel(panel, extensionPath);
 		ModuleViewPanel.runtime = session.runtime();
+		ModuleViewPanel.currentPanel = new ModuleViewPanel(panel, extensionPath);
 	}
 
 	private constructor(panel: vscode.WebviewPanel, extensionPath: string) {
@@ -54,9 +54,17 @@ export class ModuleViewPanel {
 		// Set the webview's initial html content
 		this._update();
 
+		const onValueChange = (handle: string, value: string) => {
+			// send info to the webview
+			this._panel.webview.postMessage({command: "value", value: {handle: handle, value: value}});
+		};
+
 		// Listen for when the panel is disposed
 		// This happens when the user closes the panel or when the panel is closed programatically
 		this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
+
+		// set the function callback
+		ModuleViewPanel.runtime.setOnValueChange(onValueChange);
 
 		// Handle messages from the webview
 		this._panel.webview.onDidReceiveMessage(
@@ -83,10 +91,17 @@ export class ModuleViewPanel {
 						this._panel.webview.postMessage({command: "connection-from", value: connection});
 						return;
 					}
-					case 'monitor-connection': {
+					case 'add-monitor': {
 						const handle = message.value;
 						// tell the runtime to monitor this handle value
 						ModuleViewPanel.runtime.monitorHandle(handle);
+						return;
+					}
+					case 'remove-monitor': {
+						const handle = message.value;
+						// remove the monitor handle
+						ModuleViewPanel.runtime.deleteMonitorHandle(handle);
+						return;
 					}
 				}
 			},
