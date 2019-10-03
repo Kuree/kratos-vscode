@@ -95,6 +95,7 @@ export class KratosRuntime extends EventEmitter {
 			const time = req.body.time;
 			if (typeof this._onClockEdge !== 'undefined') {
 				this._onClockEdge(time);
+				this.sendEvent("stopOnPause");
 			}
 		});
 
@@ -325,7 +326,8 @@ export class KratosRuntime extends EventEmitter {
 	}
 
 	public sendPauseOnClock(value: Boolean) {
-		var url = `http://${this._runtimeIP}:${this._runtimePort}/clock/${value}`;
+		var str = value? "on": "off";
+		var url = `http://${this._runtimeIP}:${this._runtimePort}/clock/${str}`;
 		request.post(url);
 	}
 

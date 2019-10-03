@@ -30,9 +30,10 @@ window.onload = () => {
                 remove_monitors();
 
                 hierarchy.forEach(handle_name => {
+                    console.log(handle_name);
                     let node_id = 0;
                     if (handle_map.has(handle_name)) {
-                        node_id = handle_map.get(handle_name);
+                        return;
                     } else {
                         node_id = handle_map.size;
                         handle_map.set(handle_name, node_id);
@@ -119,11 +120,6 @@ window.onload = () => {
                 }
                 break;
             }
-            case 'clock-paused': {
-                var btn_continue = document.getElementById("continue");
-                btn_continue.disabled = false;
-                break;
-            }
         }
     });
 
@@ -150,17 +146,6 @@ window.onload = () => {
         });
         handle_edge.clear();
         handle_label.clear();
-    }
-
-    // continue to the clock
-    var btn_continue = document.getElementById("continue");
-    btn_continue.onclick = () => {
-        // send it to the vscode
-        vscode.postMessage({command: "continue"});
-        // disable itself until we hit another breakpoint on the clock
-        // TODO: use better way to handle disable and enable state
-        // ideally from the runtime/moduleView themselves
-        btn_continue.disabled = true;
     }
 
     // let runtime know that we want to pause on clock edge

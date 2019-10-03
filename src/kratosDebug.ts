@@ -63,6 +63,9 @@ export class KratosDebugSession extends LoggingDebugSession {
 		this._runtime.on('stopOnBreakpoint', () => {
 			this.sendEvent(new StoppedEvent('breakpoint', KratosDebugSession.THREAD_ID));
 		});
+		this._runtime.on('stopOnPause', () => {
+			this.sendEvent(new StoppedEvent('pause', KratosDebugSession.THREAD_ID));
+		});
 		this._runtime.on('stopOnDataBreakpoint', () => {
 			this.sendEvent(new StoppedEvent('data breakpoint', KratosDebugSession.THREAD_ID));
 		});
