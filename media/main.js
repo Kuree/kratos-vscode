@@ -119,6 +119,11 @@ window.onload = () => {
                 }
                 break;
             }
+            case 'clock-paused': {
+                var btn_continue = document.getElementById("continue");
+                btn_continue.disabled = false;
+                break;
+            }
         }
     });
 
@@ -142,9 +147,34 @@ window.onload = () => {
     function remove_monitors() {
         handle_edge.forEach((_, handle, __) => {
             vscode.postMessage({ command: "remove-monitor", value: handle });
-        })
+        });
         handle_edge.clear();
         handle_label.clear();
+    }
+
+    // continue to the clock
+    var btn_continue = document.getElementById("continue");
+    btn_continue.onclick = () => {
+        // send it to the vscode
+        vscode.postMessage({command: "continue"});
+        // disable itself until we hit another breakpoint on the clock
+        // TODO: use better way to handle disable and enable state
+        // ideally from the runtime/moduleView themselves
+        btn_continue.disabled = true;
+    }
+
+    // let runtime know that we want to pause on clock edge
+    vscode.postMessage({command: "pause-on-clock", value: true});
+    var btn_pause_clock = document.getElementById("pause-on-clock");
+    var is_pause_clock = true;
+    btn_pause_clock.onclick = () => {
+        is_pause_clock = !is_pause_clock;
+        if (is_pause_clock) {
+            btn_pause_clock.innerText = "Break on Clock Edge: On ";
+        } else {
+            btn_pause_clock.innerText = "Break on Clock Edge: Off";
+        }
+        vscode.postMessage({command: "pause-on-clock", value: is_pause_clock});
     }
 
     // create a network

@@ -59,12 +59,18 @@ export class ModuleViewPanel {
 			this._panel.webview.postMessage({command: "value", value: {handle: handle, value: value}});
 		};
 
+		const onClockEdge = (time: string) => {
+			// send time info to the webview as well
+			this._panel.webview.postMessage({command: "clock-paused", value: time});
+		};
+
 		// Listen for when the panel is disposed
-		// This happens when the user closes the panel or when the panel is closed programatically
+		// This happens when the user closes the panel or when the panel is closed programmatically
 		this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
 
 		// set the function callback
 		ModuleViewPanel.runtime.setOnValueChange(onValueChange);
+		ModuleViewPanel.runtime.setOnClockEdge(onClockEdge);
 
 		// Handle messages from the webview
 		this._panel.webview.onDidReceiveMessage(
@@ -101,6 +107,15 @@ export class ModuleViewPanel {
 						const handle = message.value;
 						// remove the monitor handle
 						ModuleViewPanel.runtime.deleteMonitorHandle(handle);
+						return;
+					}
+					case 'pause-on-clock': {
+						const value = message.value;
+						ModuleViewPanel.runtime.sendPauseOnClock(value);
+						return;
+					}
+					case 'continue': {
+						ModuleViewPanel.runtime.continue();
 						return;
 					}
 				}

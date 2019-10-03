@@ -30,7 +30,18 @@
             height: 100%;
             min-height: 600px;
         }
+        .btn {
+            background-color: var(--vscode-button-background);
+            border: none;
+            height: 30px;
+            color: var(--vscode-button-foreground);
+        }
     </style>
+    <div>
+        <!--Don't need to use vue or react for simple state-->
+        <button class="btn" id="pause-on-clock">Break on Clock Edge: On </button>
+        <button class="btn" id="continue">&#9197;</button>
+    </div>
     <div id="module-view"></div>
 </body>
 

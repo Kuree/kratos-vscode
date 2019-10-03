@@ -43,6 +43,8 @@ export class KratosRuntime extends EventEmitter {
 	// callback for the module view
 	private _onValueChange?: CallableFunction;
 	public setOnValueChange(callback: CallableFunction) { this._onValueChange = callback; }
+	private _onClockEdge?: CallableFunction;
+	public setOnClockEdge(callback: CallableFunction) { this._onClockEdge = callback; }
 
 	public current_filename() { return this._current_filename; }
 	public current_num() { return this._current_line_num; }
@@ -87,6 +89,13 @@ export class KratosRuntime extends EventEmitter {
 
 		this._app.post("/status/step", (req, res) => {
 			this.on_breakpoint(req, res);
+		});
+
+		this._app.post("/status/clock", (req, res) => {
+			const time = req.body.time;
+			if (typeof this._onClockEdge !== 'undefined') {
+				this._onClockEdge(time);
+			}
 		});
 
 		this._app.post("/value", (req, res) => {
@@ -313,6 +322,11 @@ export class KratosRuntime extends EventEmitter {
 	public deleteMonitorHandle(handle: string) {
 		var url = `http://${this._runtimeIP}:${this._runtimePort}/monitor/${handle}`;
 		request.delete(url);
+	}
+
+	public sendPauseOnClock(value: Boolean) {
+		var url = `http://${this._runtimeIP}:${this._runtimePort}/clock/${value}`;
+		request.post(url);
 	}
 
 	// private methods
