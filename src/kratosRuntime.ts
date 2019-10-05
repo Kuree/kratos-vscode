@@ -45,6 +45,8 @@ export class KratosRuntime extends EventEmitter {
 	public setOnValueChange(callback: CallableFunction) { this._onValueChange = callback; }
 	private _onClockEdge?: CallableFunction;
 	public setOnClockEdge(callback: CallableFunction) { this._onClockEdge = callback; }
+	private _onTimeChange?: CallableFunction;
+	public setOnTimeChange(callback: CallableFunction) { this._onTimeChange = callback; }
 
 	public current_filename() { return this._current_filename; }
 	public current_num() { return this._current_line_num; }
@@ -136,6 +138,10 @@ export class KratosRuntime extends EventEmitter {
 		promises.push(new Promise((resolve, reject) => {
 			request.get(`http://${this._runtimeIP}:${this._runtimePort}/time`, (_, res, body) => {
 				if (res.statusCode === 200) {
+					// update to the time if possible
+					if (typeof this._onTimeChange !== 'undefined') {
+						this._onTimeChange(body);
+					}
 					resolve({ name: "Time", value: body });
 				} else {
 					reject("Unknown value");
@@ -329,6 +335,11 @@ export class KratosRuntime extends EventEmitter {
 		var str = value? "on": "off";
 		var url = `http://${this._runtimeIP}:${this._runtimePort}/clock/${str}`;
 		request.post(url);
+	}
+
+	public clearAllMonitors() {
+		var url = `http://${this._runtimeIP}:${this._runtimePort}/monitor`;
+		request.delete(url);
 	}
 
 	// private methods

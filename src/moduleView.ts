@@ -62,6 +62,11 @@ export class ModuleViewPanel {
 		const onClockEdge = (time: string) => {
 			// send time info to the webview as well
 			this._panel.webview.postMessage({command: "clock-paused", value: time});
+			this._panel.webview.postMessage({command: "time", value: time});
+		};
+
+		const onTimeChange = (time: string) => {
+			this._panel.webview.postMessage({command: "time", value: time});
 		};
 
 		// Listen for when the panel is disposed
@@ -71,6 +76,7 @@ export class ModuleViewPanel {
 		// set the function callback
 		ModuleViewPanel.runtime.setOnValueChange(onValueChange);
 		ModuleViewPanel.runtime.setOnClockEdge(onClockEdge);
+		ModuleViewPanel.runtime.setOnTimeChange(onTimeChange);
 
 		// Handle messages from the webview
 		this._panel.webview.onDidReceiveMessage(
@@ -137,6 +143,10 @@ export class ModuleViewPanel {
 				x.dispose();
 			}
 		}
+		// clear the monitors
+		ModuleViewPanel.runtime.clearAllMonitors();
+		// no pause on edge
+		ModuleViewPanel.runtime.sendPauseOnClock(false);
 	}
 
 	public static revive(panel: vscode.WebviewPanel, extensionPath: string) {

@@ -36,10 +36,14 @@
             height: 30px;
             color: var(--vscode-button-foreground);
         }
+        .display {
+            color: var(--vscode-input-foreground);
+        }
     </style>
     <div>
         <!--Don't need to use vue or react for simple state-->
         <button class="btn" id="pause-on-clock">Break on Clock Edge: On</button>
+        <label class="display" id="time-display"></label>
     </div>
     <div id="module-view"></div>
 </body>

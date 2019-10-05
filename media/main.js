@@ -5,6 +5,8 @@ window.onload = () => {
 
     // styling
     const fontColor = getComputedStyle(document.documentElement).getPropertyValue('--vscode-editor-foreground');
+    const barBackgroundColor = getComputedStyle(document.documentElement).getPropertyValue('--vscode-statusBar-background');
+    const barDebugBackgroundColor = getComputedStyle(document.documentElement).getPropertyValue('--vscode-statusBar-debuggingBackground');
 
     // const oldState = vscode.getState();
     var nodes = new vis.DataSet([]);
@@ -15,6 +17,7 @@ window.onload = () => {
     var edges_map = new Map();
     var handle_edge = new Map();
     var handle_label = new Map();
+    var edge_value = new Map();
 
     // Handle messages sent from the extension to the webview
     window.addEventListener('message', event => {
@@ -80,7 +83,8 @@ window.onload = () => {
                                 id: edges_set.length,
                                 font: {
                                     color: fontColor, strokeWidth: 0
-                                }
+                                },
+                                color: barBackgroundColor
                             };
                             edges.add(edge);
                             new_edges.push(edge);
@@ -91,8 +95,6 @@ window.onload = () => {
                     }
                 });
                 // we need to send monitor to connected edges
-                console.log(new_edges);
-                console.log(new_edges.length);
                 new_edges.forEach((edge, _, __) => {
                     // we only need the from one since it's wired together
                     const handle = edge.var;
@@ -115,9 +117,19 @@ window.onload = () => {
                 if (edge) {
                     var label = handle_label.get(handle);
                     label += "\n" + v;
-                    edge.label = label;
+                    if (edge.label === label) {
+                        edge.color = barBackgroundColor;
+                    } else {
+                        edge.label = label;
+                        edge.color = barDebugBackgroundColor;
+                    }
                     edges.update(edge);
                 }
+                break;
+            }
+            case 'time': {
+                const label = document.getElementById("time-display");
+                label.innerHTML = ` Time: ${message.value}`
                 break;
             }
         }
