@@ -12,7 +12,7 @@ This will dump a database file called `debug.db` in your current working
 directory. 
 
 ## Using Kratos VS Code Debugger Extension
-* Install the *extension* in VS Code
+* Install the *extension* in VS Code. You can search `kratos-vscode` in the extension page.
 * Compile `kratos-runtime`, which can be obtained from [here](https://github.com/Kuree/kratos-runtime).
 * Start your favorite Verilog simulator:
   - For Verilator, make sure you enable ``--vpi``, put ``initialize_runtime()``
