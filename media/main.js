@@ -30,7 +30,6 @@ window.onload = () => {
                 id_to_handle.clear();
                 edges.clear();
                 edges_set.clear();
-                remove_monitors();
 
                 hierarchy.forEach(handle_name => {
                     console.log(handle_name);
@@ -98,7 +97,6 @@ window.onload = () => {
                 new_edges.forEach((edge, _, __) => {
                     // we only need the from one since it's wired together
                     const handle = edge.var;
-                    monitor_edge(handle, edge);
                     handle_label.set(handle, edge.label);
                 })
                 break;
@@ -145,19 +143,6 @@ window.onload = () => {
 
     function get_connection_from(handle_name) {
         vscode.postMessage({ command: "connection-from", value: handle_name });
-    }
-
-    function monitor_edge(handle_name, edge) {
-        vscode.postMessage({ command: "add-monitor", value: handle_name });
-        handle_edge.set(handle_name, edge);
-    }
-
-    function remove_monitors() {
-        handle_edge.forEach((_, handle, __) => {
-            vscode.postMessage({ command: "remove-monitor", value: handle });
-        });
-        handle_edge.clear();
-        handle_label.clear();
     }
 
     // let runtime know that we want to pause on clock edge

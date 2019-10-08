@@ -59,13 +59,20 @@ export class ModuleViewPanel {
 			this._panel.webview.postMessage({command: "value", value: {handle: handle, value: value}});
 		};
 
-		const onClockEdge = (time: string) => {
+		const onClockEdge = (value: any) => {
 			// send time info to the webview as well
-			this._panel.webview.postMessage({command: "clock-paused", value: time});
+			const time = value.time;
+			this._panel.webview.postMessage({command: "clock-paused", value: value});
 			this._panel.webview.postMessage({command: "time", value: time});
+			// send values over
+			const values: Map<string, string> = value.value;
+			values.forEach((v, name) => {
+				this._panel.webview.postMessage({command: "value", "value": {handle: name, value: v}});
+			});
+
 		};
 
-		const onTimeChange = (time: string) => {
+		const onTimeChange = (time: any) => {
 			this._panel.webview.postMessage({command: "time", value: time});
 		};
 
