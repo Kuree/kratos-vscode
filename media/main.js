@@ -18,6 +18,7 @@ window.onload = () => {
     var handle_edge = new Map();
     var handle_label = new Map();
     var edge_value = new Map();
+    var current_scope = "$";
 
     // Handle messages sent from the extension to the webview
     window.addEventListener('message', event => {
@@ -134,6 +135,7 @@ window.onload = () => {
     });
 
     function get_graph(handle_name) {
+        current_scope = handle_name;
         vscode.postMessage({ command: "hierarchy", value: handle_name });
     }
 
@@ -169,5 +171,26 @@ window.onload = () => {
     var network = new vis.Network(container, data, options);
 
     get_graph("$");
+
+    // register the callbacks
+    network.on("doubleClick", (params) => {
+        const node = params.nodes[0];
+        if (typeof node !== 'undefined') {
+            // change scope to that one
+            const handle_name = id_to_handle.get(node);
+            if (handle_name) {
+                get_graph(handle_name);
+            }
+        } else {
+            // go back to the parent scope, if possible
+            var handles = current_scope.split(".");
+            if (handles.length > 1) {
+                const new_scope = handles.slice(0, handles.length - 1).join(".");
+                get_graph(new_scope);
+            } else {
+                get_graph("$");
+            }
+        }
+    });
 
 };
