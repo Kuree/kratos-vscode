@@ -187,7 +187,7 @@ window.onload = () => {
             if (handles.length > 1) {
                 const new_scope = handles.slice(0, handles.length - 1).join(".");
                 get_graph(new_scope);
-            } else {
+            } else if (current_scope !== "$" && handles.length === 0) {
                 get_graph("$");
             }
         }

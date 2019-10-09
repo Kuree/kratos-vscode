@@ -65,7 +65,7 @@ export class ModuleViewPanel {
 			this._panel.webview.postMessage({command: "clock-paused", value: value});
 			this._panel.webview.postMessage({command: "time", value: time});
 			// send values over
-			const values: Map<string, string> = value.value;
+			const values: Map<string, string> = new Map<string, string>(Object.entries(value.value));
 			values.forEach((v, name) => {
 				this._panel.webview.postMessage({command: "value", "value": {handle: name, value: v}});
 			});
@@ -151,7 +151,7 @@ export class ModuleViewPanel {
 			}
 		}
 		// clear the monitors
-		ModuleViewPanel.runtime.clearAllMonitors();
+		// ModuleViewPanel.runtime.clearAllMonitors();
 		// no pause on edge
 		ModuleViewPanel.runtime.sendPauseOnClock(false);
 	}
