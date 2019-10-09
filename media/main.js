@@ -19,15 +19,39 @@ window.onload = () => {
     var handle_label = new Map();
     var edge_value = new Map();
     var current_scope = "$";
+    var value_to_display = undefined;
+
+    const updateEdge = (handle, v) => {
+        // monitored value
+        // find the edge handle
+        // FIXME: use the top name from the webview
+        if (handle.indexOf("TOP.") === 0) {
+            handle = handle.replace("TOP.", "");
+        }
+        const edge = edges_map.get(handle);
+        if (edge) {
+            var label = handle_label.get(handle);
+            label += "\n" + v;
+            if (edge.label === label) {
+                edge.color = barBackgroundColor;
+            } else {
+                edge.label = label;
+                edge.color = barDebugBackgroundColor;
+            }
+            edges.update(edge);
+        }
+    }
 
     // Handle messages sent from the extension to the webview
     window.addEventListener('message', event => {
         const message = event.data; // The json data that the extension sent
         switch (message.command) {
             case 'hierarchy': {
-                const hierarchy = JSON.parse(message.value);
+                const value = message.value;
+                const hierarchy = value.hierarchy;
                 nodes.clear();
                 handle_map.clear();
+                edges_map.clear();
                 id_to_handle.clear();
                 edges.clear();
                 edges_set.clear();
@@ -53,6 +77,10 @@ window.onload = () => {
                     get_connection_from(handle_name);
                     get_connection_to(handle_name);
                 });
+
+                // update the edge values, if any
+                const values = value.value;
+                value_to_display = values;
                 break;
             }
             case 'connection-to':
@@ -80,7 +108,7 @@ window.onload = () => {
                                 arrows: "to",
                                 label: label,
                                 var: `${handle_from}.${var_from}`,
-                                id: edges_set.length,
+                                id: `${handle_from}.${var_from}`,
                                 font: {
                                     color: fontColor, strokeWidth: 0
                                 },
@@ -100,30 +128,18 @@ window.onload = () => {
                     const handle = edge.var;
                     handle_label.set(handle, edge.label);
                 })
+                // show values
+                if (typeof value_to_display !== 'undefined') {
+                    Object.keys(value_to_display).forEach((handle) => {
+                        updateEdge(handle, value_to_display[handle]);
+                    })
+                }
                 break;
             }
             case 'value': {
                 // monitored value
                 const value = message.value;
-                var handle = value.handle;
-                const v = value.value;
-                // find the edge handle
-                // FIXME: use the top name from the webview
-                if (handle.indexOf("TOP.") === 0) {
-                    handle = handle.replace("TOP.", "");
-                }
-                const edge = edges_map.get(handle);
-                if (edge) {
-                    var label = handle_label.get(handle);
-                    label += "\n" + v;
-                    if (edge.label === label) {
-                        edge.color = barBackgroundColor;
-                    } else {
-                        edge.label = label;
-                        edge.color = barDebugBackgroundColor;
-                    }
-                    edges.update(edge);
-                }
+                updateEdge(value.handle, value.value);
                 break;
             }
             case 'time': {

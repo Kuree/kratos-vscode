@@ -29,7 +29,6 @@ export class KratosRuntime extends EventEmitter {
 	private _current_local_variables = new Map<string, string>();
 	private _current_generator_variables = new Map<string, string>();
 	private _current_self_variables = new Map<string, string>();
-	private _current_edge_variables = new Map<string, string>();
 
 	// need to pull this from configuration
 	private _runtimeIP = "0.0.0.0";
@@ -54,7 +53,6 @@ export class KratosRuntime extends EventEmitter {
 	public getCurrentLocalVariables() { return this._current_local_variables; }
 	public getCurrentGeneratorVariables() { return this._current_generator_variables; }
 	public getCurrentSelfVariables() { return this._current_self_variables; }
-	public getCurrentEdgeVariables() { return this._current_edge_variables; }
 
 	public setRuntimeIP(ip: string) { this._runtimeIP = ip; }
 	public setRuntimePort(port: number) { this._runtimePort = port; }
@@ -99,7 +97,6 @@ export class KratosRuntime extends EventEmitter {
 			const time = req.body.time;
 			// get the values as well
 			const values = req.body.value;
-			this._current_edge_variables = new Map<string, string>(Object.entries(values));
 			if (typeof this._onClockEdge !== 'undefined') {
 				this._onClockEdge({time: time, value: values});
 				this.sendEvent("stopOnPause");
@@ -291,7 +288,13 @@ export class KratosRuntime extends EventEmitter {
 		return new Promise((resolve, reject) => {
 			request.post(url, (_, res, __) => {
 				if (res.statusCode === 200) {
-					resolve(res.body);
+					const value = JSON.parse(res.body);
+					const values = value.value;
+					if (typeof values !== 'undefined') {
+						resolve({name: value.name, value: values.value});
+					} else {
+						resolve({name: value.name});
+					}
 				} else {
 					reject();
 				}

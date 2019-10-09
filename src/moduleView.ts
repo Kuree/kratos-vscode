@@ -59,17 +59,26 @@ export class ModuleViewPanel {
 			this._panel.webview.postMessage({command: "value", value: {handle: handle, value: value}});
 		};
 
+		const updateValue = (value: any) => {
+			// send values over
+			var values: Map<string, string>;
+			if (!(value instanceof Map)) {
+				values = new Map<string, string>(Object.entries(value));
+			} else {
+				values = value;
+			}
+			values.forEach((v, name) => {
+				this._panel.webview.postMessage({command: "value", "value": {handle: name, value: v}});
+			});
+		};
+
 		const onClockEdge = (value: any) => {
 			// send time info to the webview as well
 			const time = value.time;
 			this._panel.webview.postMessage({command: "clock-paused", value: value});
 			this._panel.webview.postMessage({command: "time", value: time});
-			// send values over
-			const values: Map<string, string> = new Map<string, string>(Object.entries(value.value));
-			values.forEach((v, name) => {
-				this._panel.webview.postMessage({command: "value", "value": {handle: name, value: v}});
-			});
 
+			updateValue(value.value);
 		};
 
 		const onTimeChange = (time: any) => {
@@ -90,10 +99,14 @@ export class ModuleViewPanel {
 			async message => {
 				switch (message.command) {
 					case 'hierarchy': {
-						const name = message.value;
-						const hierarchy = await ModuleViewPanel.runtime.getHierarchy(name);
+						const value = message.value;
+						const hierarchy: any = await ModuleViewPanel.runtime.getHierarchy(value);
 						// send it back
-						this._panel.webview.postMessage({command: "hierarchy", value: hierarchy});
+						if (typeof hierarchy.value !== 'undefined') {
+							this._panel.webview.postMessage({command: "hierarchy", value: {hierarchy: hierarchy.name, value: hierarchy.value}});
+						} else {
+							this._panel.webview.postMessage({command: "hierarchy", value: {hierarchy: hierarchy.name}});
+						}
 						return;
 					}
 					case 'connection-to': {
