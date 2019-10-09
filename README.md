@@ -39,3 +39,12 @@ Once you're in the debugging session, open the command prompt (or pressing
 <kbd>F1</kbd>), then type Kratos. You will see an option of Kratos module
 viewer. Once you open it, you can see the visualization of all different
 modules in different hierarchy.
+
+Here is a list of available actions you can take on the module viewer:
+- Hover mouse on any module will show the full name.
+- Double click a module will "zoom in" into that instance scope
+- Double click the empty background will bring you one level back in the hierarchy.
+- Click `Break on Clock Edge: On` will disable the break on clock edge.
+
+
+![Graph demo](images/graph.gif)
