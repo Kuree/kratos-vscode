@@ -62,7 +62,7 @@ export class KratosRuntime extends EventEmitter {
 		super();
 	}
 
-	private on_breakpoint(req, res) {
+	private on_breakpoint(req, res, is_exception = false) {
 		// we will get a list of values
 		var payload: Array<string> = req.body;
 		var local: Object = payload["local"];
@@ -75,7 +75,11 @@ export class KratosRuntime extends EventEmitter {
 		this._current_local_variables = new Map<string, string>(Object.entries(local));
 		this._current_self_variables = new Map<string, string>(Object.entries(self));
 		this._current_generator_variables = new Map<string, string>(Object.entries(generator));
-		this.fireEventsForBreakPoint(id);
+		if (!is_exception) {
+			this.fireEventsForBreakPoint(id);
+		} else {
+			this.fireEventsForException();
+		}
 	}
 
 	/**
@@ -91,6 +95,10 @@ export class KratosRuntime extends EventEmitter {
 
 		this._app.post("/status/step", (req, res) => {
 			this.on_breakpoint(req, res);
+		});
+
+		this._app.post("/status/exception", (req, res) => {
+			this.on_breakpoint(req, res, true);
 		});
 
 		this._app.post("/status/clock", (req, res) => {
@@ -425,7 +433,10 @@ export class KratosRuntime extends EventEmitter {
 		} else {
 			this.sendEvent("stopOnBreakpoint");
 		}
+	}
 
+	private fireEventsForException() {
+		this.sendEvent("stopOnException");
 	}
 
 	private sendEvent(event: string, ...args: any[]) {
