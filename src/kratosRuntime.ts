@@ -28,7 +28,6 @@ export class KratosRuntime extends EventEmitter {
 	private _current_breakpoint_id = -1;
 	private _current_local_variables = new Map<string, string>();
 	private _current_generator_variables = new Map<string, string>();
-	private _current_self_variables = new Map<string, string>();
 
 	// need to pull this from configuration
 	private _runtimeIP = "0.0.0.0";
@@ -52,7 +51,6 @@ export class KratosRuntime extends EventEmitter {
 	public current_num() { return this._current_line_num; }
 	public getCurrentLocalVariables() { return this._current_local_variables; }
 	public getCurrentGeneratorVariables() { return this._current_generator_variables; }
-	public getCurrentSelfVariables() { return this._current_self_variables; }
 
 	public setRuntimeIP(ip: string) { this._runtimeIP = ip; }
 	public setRuntimePort(port: number) { this._runtimePort = port; }
@@ -72,8 +70,10 @@ export class KratosRuntime extends EventEmitter {
 		this._current_filename = payload["filename"];
 		this._current_line_num = Number.parseInt(payload["line_num"]);
 		this._current_breakpoint_id = id;
-		this._current_local_variables = new Map<string, string>(Object.entries(local));
-		this._current_self_variables = new Map<string, string>(Object.entries(self));
+		const local_variables = new Map<string, string>(Object.entries(local));
+		const self_variable = new Map<string, string>(Object.entries(self));
+		// merge this two
+		this._current_local_variables = new Map<string, string>([...local_variables, ...self_variable]);
 		this._current_generator_variables = new Map<string, string>(Object.entries(generator));
 		if (!is_exception) {
 			this.fireEventsForBreakPoint(id);

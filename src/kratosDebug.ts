@@ -31,9 +31,6 @@ export class KratosDebugSession extends LoggingDebugSession {
 
 	private _variableHandles = new Handles<string>();
 
-	// self handle
-	private _selfHandle = this._variableHandles.create("self");
-
 	private _configurationDone = new Subject();
 
 	private _cancellationTokens = new Map<number, boolean>();
@@ -250,20 +247,32 @@ export class KratosDebugSession extends LoggingDebugSession {
 		// 0 is local
 		if (id === "local") {
 			const vars = this._runtime.getCurrentLocalVariables();
+			let handles = new Set<string>();
 			vars.forEach((value: string, name: string) => {
-				variables.push({
-					name: name,
-					type: "integer",
-					value: value,
-					variablesReference: 0
-				});
-			});
-			// notice that we nested self into it
-			variables.push({
-				name: "self",
-				type: "object",
-				value: "Object",
-				variablesReference: this._selfHandle
+				// determine whether the name has any dot in it
+				// this is top level
+				if (name.includes(".")) {
+					// only create handle for the first level
+					// we will handle them recursively
+					const handle_name = name.split(".")[0];
+					if (!handles.has(handle_name)) {
+						const ref = this._variableHandles.create(handle_name);
+						variables.push({
+							name: handle_name,
+							type: "object",
+							value: "Object",
+							variablesReference: ref
+						});
+						handles.add(handle_name);
+					}
+				} else {
+					variables.push({
+						name: name,
+						type: "integer",
+						value: value,
+						variablesReference: 0
+					});
+				}
 			});
 		} else if (id === "global") {
 			const vars = await this._runtime.getGlobalVariables();
@@ -272,16 +281,6 @@ export class KratosDebugSession extends LoggingDebugSession {
 					name: entry.name,
 					type: "integer",
 					value: entry.value,
-					variablesReference: 0
-				});
-			});
-		} else if (id === "self") {
-			const vars = this._runtime.getCurrentSelfVariables();
-			vars.forEach((value: string, name: string) => {
-				variables.push({
-					name: name,
-					type: "integer",
-					value: value,
 					variablesReference: 0
 				});
 			});
@@ -294,6 +293,38 @@ export class KratosDebugSession extends LoggingDebugSession {
 					value: value,
 					variablesReference: 0
 				});
+			});
+		} else {
+			// we run a query to figure out any lower level
+			const vars = this._runtime.getCurrentLocalVariables();
+			// we will include the dot here
+			const id_name = id + ".";
+			let handles = new Set<string>();
+			vars.forEach((value: string, name: string) => {
+				if (name.length >= id_name.length && name.substr(0, id_name.length) === id_name) {
+					const sub_name = name.substr(id_name.length);
+					if (sub_name.includes(".")) {
+						const next_name = sub_name.split(".")[0];
+						if (!handles.has(next_name)) {
+							const ref = this._variableHandles.create(id_name + next_name);
+							variables.push({
+								name: next_name,
+								type: "object",
+								value: "Object",
+								variablesReference: ref
+							});
+							handles.add(next_name);
+						}
+					} else {
+						// that's it
+						variables.push({
+							name: sub_name,
+							type: "integer",
+							value: value,
+							variablesReference: 0
+						});
+					}
+				}
 			});
 		}
 
