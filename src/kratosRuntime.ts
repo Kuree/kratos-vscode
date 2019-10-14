@@ -265,8 +265,6 @@ export class KratosRuntime extends EventEmitter {
 		request(options, (_, res, body) => {
 			if (res.statusCode === 200) {
 				fn(0);
-			} else {
-				return vscode.window.showErrorMessage(`Failed to get breakpoint at ${filename}:${line}`);
 			}
 		});
 	}
