@@ -39,6 +39,9 @@ export class KratosRuntime extends EventEmitter {
 	private _current_filename: string;
 	private _current_line_num: number;
 
+	private _srcPath: string = "";
+	private _dstPath: string = "";
+
 	// callback for the module view
 	private _onValueChange?: CallableFunction;
 	public setOnValueChange(callback: CallableFunction) { this._onValueChange = callback; }
@@ -54,6 +57,9 @@ export class KratosRuntime extends EventEmitter {
 
 	public setRuntimeIP(ip: string) { this._runtimeIP = ip; }
 	public setRuntimePort(port: number) { this._runtimePort = port; }
+
+	public setSrcPath(path: string) { this._srcPath = path; }
+	public setDstPath(path: string) { this._dstPath = path; }
 
 
 	constructor() {
@@ -387,6 +393,10 @@ export class KratosRuntime extends EventEmitter {
 		file = path.resolve(file);
 		const ip = await utils.get_ip();
 		var payload = { ip: ip, port: this._debuggerPort, database: file };
+		if (this._srcPath !== "" && this._dstPath !== "") {
+			payload["src_path"] = this._srcPath;
+			payload["dst_path"] = this._dstPath;
+		}
 		var url = `http://${this._runtimeIP}:${this._runtimePort}/connect`;
 		var options = {
 			method: "post",

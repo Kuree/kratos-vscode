@@ -19,6 +19,9 @@ interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArguments {
 	stopOnEntry?: boolean;
 	/** enable logging the Debug Adapter Protocol */
 	trace?: boolean;
+	// remote debugging
+	srcPath?: string;
+	dstPath?: string;
 }
 
 export class KratosDebugSession extends LoggingDebugSession {
@@ -153,6 +156,10 @@ export class KratosDebugSession extends LoggingDebugSession {
 		// set the runtime configuration
 		this._runtime.setRuntimeIP(args.runtimeIP);
 		this._runtime.setRuntimePort(args.runtimePort);
+
+		// set remote debugging
+		this._runtime.setSrcPath(args.srcPath? args.srcPath: "");
+		this._runtime.setDstPath(args.dstPath? args.dstPath: "");
 
 		// start the program in the runtime
 		this._runtime.start(args.program, !!args.stopOnEntry);

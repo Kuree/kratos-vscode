@@ -77,6 +77,13 @@ class KratosConfigurationProvider implements vscode.DebugConfigurationProvider {
 		if (!config.stopOnEntry) {
 			config.stopOnEntry = true;
 		}
+		if (!config.dstPath) {
+			config.dstPath = "";
+		}
+		if (!config.srcPath) {
+			config.srcPath = "";
+		}
+
 		var promise: Array<Promise<string>> = [];
 		if (!config.program) {
 			// trying to find a db file in the current working directory
@@ -104,7 +111,7 @@ class KratosConfigurationProvider implements vscode.DebugConfigurationProvider {
 			config.program = result[0];
 		}
 
-		if (!config.program) {
+		if (!config.program && config.srcPath !== "") {
 			return vscode.window.showInformationMessage("Cannot find a program to debug").then(_ => {
 				return undefined;	// abort launch
 			});

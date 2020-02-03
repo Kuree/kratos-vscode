@@ -61,6 +61,16 @@
                 "type": "number",
                 "description": "Port number of the machine that's running simulation",
                 "default": 8888
+              },
+              "srcPath": {
+                "type": "string",
+                "description": "User's source code mapped to",
+                "default": ""
+              },
+              "dstPath": {
+                "type": "string",
+                "description": "Remote reserver's code path",
+                "default": ""
               }
             }
           }
