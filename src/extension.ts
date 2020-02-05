@@ -1,7 +1,7 @@
 'use strict';
 
 import * as vscode from 'vscode';
-import { WorkspaceFolder, DebugConfiguration, ProviderResult, CancellationToken } from 'vscode';
+import { WorkspaceFolder, DebugConfiguration, ProviderResult, CancellationToken, commands} from 'vscode';
 import { KratosDebugSession } from './kratosDebug';
 import * as Net from 'net';
 import * as path from 'path';
@@ -32,6 +32,15 @@ export function activate(context: vscode.ExtensionContext) {
 			ModuleViewPanel.createOrShow(context.extensionPath, factory.session);
 		})
 	);
+
+	// this is for scope viewing
+	context.subscriptions.push(
+		commands.registerTextEditorCommand('kratos.scope', editor => {
+			vscode.window.showInformationMessage("works");
+		})
+	);
+
+	console.log("here");
 
 
 	if (vscode.window.registerWebviewPanelSerializer) {

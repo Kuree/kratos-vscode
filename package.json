@@ -111,8 +111,22 @@
         "command": "kratosView.start",
         "title": "Start Kratos module view",
         "category": "Kratos"
+      },
+      {
+        "command": "kratos.scope",
+        "title": "View Kratos design scope",
+        "category": "Kratos"
       }
-    ]
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "group": "navigation",
+          "command": "kratos.scope",
+          "when": "inDebugMode && debugType == 'kratos'"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "tsc -p ./src",
