@@ -15,8 +15,7 @@
     "Debuggers"
   ],
   "activationEvents": [
-    "onDebug",
-    "onCommand:extension.kratos-debug.getProgramName"
+    "*"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -116,6 +115,15 @@
         "command": "kratos.scope",
         "title": "View Kratos design scope",
         "category": "Kratos"
+      },
+      {
+        "command": "kratos.stopOnSync",
+        "title": "Enter Kratos design scope",
+        "category": "Kratos",
+        "icon": {
+					"light": "$(search)",
+					"dark": "$(search)"
+				}
       }
     ],
     "menus": {
@@ -123,9 +131,16 @@
         {
           "group": "navigation",
           "command": "kratos.scope",
-          "when": "inDebugMode && debugType == 'kratos'"
+          "when": "inDebugMode && debugType == 'kratos' && kratos.scopeAllowed"
         }
-      ]
+      ],
+      "debug/toolbar": [
+				{
+					"command": "kratos.stopOnSync",
+					"group": "navigation",
+					"when": "debugType == kratos"
+				}
+			]
     }
   },
   "scripts": {

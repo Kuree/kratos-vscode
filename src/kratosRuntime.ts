@@ -26,8 +26,9 @@ export class KratosRuntime extends EventEmitter {
 	private _breakpointId = 1;
 
 	private _current_breakpoint_id = -1;
-	private _current_local_variables = new Map<string, string>();
-	private _current_generator_variables = new Map<string, string>();
+	private _current_local_variables = new Array<Map<string, string>>();
+	private _current_generator_names = new Array<string>();
+	private _current_generator_variables = new Array<Map<string, string>>();
 
 	// need to pull this from configuration
 	private _runtimeIP = "0.0.0.0";
@@ -42,6 +43,9 @@ export class KratosRuntime extends EventEmitter {
 	private _srcPath: string = "";
 	private _dstPath: string = "";
 
+	// control whether to hide the context menu during the debug mode
+	private _scopeAllowed: utils.ContextKey = new utils.ContextKey("kratos.scopeAllowed");
+
 	// callback for the module view
 	private _onValueChange?: CallableFunction;
 	public setOnValueChange(callback: CallableFunction) { this._onValueChange = callback; }
@@ -54,6 +58,7 @@ export class KratosRuntime extends EventEmitter {
 	public current_num() { return this._current_line_num; }
 	public getCurrentLocalVariables() { return this._current_local_variables; }
 	public getCurrentGeneratorVariables() { return this._current_generator_variables; }
+	public getCurrentGeneratorNames() { return this._current_generator_names; }
 
 	public setRuntimeIP(ip: string) { this._runtimeIP = ip; }
 	public setRuntimePort(port: number) { this._runtimePort = port; }
@@ -67,25 +72,19 @@ export class KratosRuntime extends EventEmitter {
 	}
 
 	private on_breakpoint(req, res, is_exception = false) {
+		this._current_local_variables = [];
+		this._current_generator_variables = [];
+		this._current_generator_names = [];
 		// we will get a list of values
 		var payload: Array<string> = req.body;
-		var local: Object = payload["local"];
-		var self: Object = payload["self"];
-		var generator: Object = payload["generator"];
-		var id = Number.parseInt(payload["id"]);
-		this._current_filename = payload["filename"];
-		this._current_line_num = Number.parseInt(payload["line_num"]);
-		this._current_breakpoint_id = id;
-		const local_variables = new Map<string, string>(Object.entries(local));
-		const self_variable = new Map<string, string>(Object.entries(self));
-		// merge this two
-		this._current_local_variables = new Map<string, string>([...local_variables, ...self_variable]);
-		this._current_generator_variables = new Map<string, string>(Object.entries(generator));
+		const id = this.add_frame_info(payload);
 		if (!is_exception) {
 			this.fireEventsForBreakPoint(id);
 		} else {
 			this.fireEventsForException();
 		}
+		// disable scopes
+		this._scopeAllowed.set(false);
 	}
 
 	/**
@@ -113,7 +112,7 @@ export class KratosRuntime extends EventEmitter {
 			const values = req.body.value;
 			if (typeof this._onClockEdge !== 'undefined') {
 				this._onClockEdge({time: time, value: values});
-				this.sendEvent("stopOnPause");
+				this.sendEvent("stopOnDataBreakpoint");
 			}
 		});
 
@@ -143,6 +142,15 @@ export class KratosRuntime extends EventEmitter {
 			server.close();
 			this.sendEvent('end');
 		});
+
+		// on synth
+		this._app.post("/status/synth", (_, __) => {
+			// allow synth
+			this.stoppedOnSync();
+		});
+
+		// disable scopes
+		this._scopeAllowed.set(false);
 	}
 
 	public async stop() {
@@ -167,6 +175,54 @@ export class KratosRuntime extends EventEmitter {
 
 		var vars = await Promise.all(promises);
 		return vars;
+	}
+
+	private add_frame_info(payload: Object) {
+		var local: Object = payload["local"];
+		var self: Object = payload["self"];
+		var generator: Object = payload["generator"];
+		var id = Number.parseInt(payload["id"]);
+		this._current_filename = payload["filename"];
+		this._current_line_num = Number.parseInt(payload["line_num"]);
+		this._current_breakpoint_id = id;
+		// conver them into the format and store them
+		const local_variables = new Map<string, string>(Object.entries(local));
+		const self_variable = new Map<string, string>(Object.entries(self));
+		// merge this two
+		this._current_local_variables.push(new Map<string, string>([...local_variables, ...self_variable]));
+		// get instance name
+		const instance_name = payload["instance_name"];
+		generator["instance_name"] = instance_name;
+		this._current_generator_names.push(instance_name);
+		this._current_generator_variables.push(new Map<string, string>(Object.entries(generator)));
+		return id;
+	}
+
+	public async getScope(filename: string, line_num: Number) {
+		const url = `http://${this._runtimeIP}:${this._runtimePort}/context/${filename}:${line_num}`;
+		var options = {
+			method: "get",
+			json: true,
+			url: url
+		};
+		return new Promise((resolve, reject) => {
+			request(options, (_, res, __) => {
+				if (res.statusCode === 200) {
+					const values = res.body;
+					this._current_local_variables = [];
+					this._current_generator_variables = [];
+					this._current_generator_names = [];
+					for (let i = 0; i < values.length; i++) {
+						const payload = JSON.parse(values[i]);
+						this.add_frame_info(payload);
+					}
+				    resolve();
+				} else {
+					reject();
+				}
+			});
+		});
+		// this is the local variable
 	}
 
 	private run(is_step: Boolean) {
@@ -278,20 +334,35 @@ export class KratosRuntime extends EventEmitter {
 	public stack() {
 		// we only have one stack frame
 		var frames: Array<any> = [];
+		const num_frames = this._current_local_variables.length;
 		if (this._current_breakpoint_id >= 0) {
 			const filename = this.current_filename();
 			const line_num = this.current_num();
-			frames.push({
-				index: 0,
-				name: "Simulator Frame",
-				file: filename,
-				line: line_num
-			});
+			for (let i = 0; i < num_frames; i++) {
+				frames.push({
+					index: i,
+					name: "Instance " + this._current_generator_names[i],
+					file: filename,
+					line: line_num
+				});
+			}
+
 		}
 		return {
 			frames: frames,
-			count: 1
+			count: num_frames
 		};
+	}
+
+	public stopOnSync() {
+		var url = `http://${this._runtimeIP}:${this._runtimePort}/clock/synth`;
+		request.post(url);
+	}
+
+	public stoppedOnSync() {
+		vscode.window.showInformationMessage("The simulator has synchornized read and write. You're free to explore different scopes");
+		this._scopeAllowed.set(true);
+		this.sendEvent("stopOnPause");
 	}
 
 	// get hierarchy

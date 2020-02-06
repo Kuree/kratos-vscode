@@ -6,6 +6,7 @@ import { KratosDebugSession } from './kratosDebug';
 import * as Net from 'net';
 import * as path from 'path';
 import { ModuleViewPanel} from './moduleView';
+import {ContextKey} from './utils';
 
 
 export function activate(context: vscode.ExtensionContext) {
@@ -36,12 +37,20 @@ export function activate(context: vscode.ExtensionContext) {
 	// this is for scope viewing
 	context.subscriptions.push(
 		commands.registerTextEditorCommand('kratos.scope', editor => {
-			vscode.window.showInformationMessage("works");
+			factory.session.getScope(editor);
 		})
 	);
 
-	console.log("here");
-
+	context.subscriptions.push(
+		commands.registerTextEditorCommand('kratos.stopOnSync', () => {
+			factory.session.runtime().stopOnSync();
+		})
+	);
+	// disable the context menu by default
+	// the implementation is copied from
+	// microsoft/vscode-extension-samples/vim-sample
+	let c = new ContextKey("kratos.scopeAllowed");
+	c.set(false);
 
 	if (vscode.window.registerWebviewPanelSerializer) {
 		// Make sure we register a serializer in activation event

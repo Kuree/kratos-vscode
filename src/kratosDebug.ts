@@ -2,11 +2,12 @@ import {
 	Logger, logger,
 	LoggingDebugSession,
 	InitializedEvent, TerminatedEvent, StoppedEvent, BreakpointEvent, OutputEvent,
-	Thread, StackFrame, Scope, Source, Handles, Breakpoint
+	Thread, StackFrame, Scope, Source, Handles, Breakpoint, ThreadEvent
 } from 'vscode-debugadapter';
 import { DebugProtocol } from 'vscode-debugprotocol';
 import { basename } from 'path';
 import { KratosRuntime, KratosBreakpoint } from './kratosRuntime';
+import * as vscode from 'vscode';
 const { Subject } = require('await-notify');
 
 interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArguments {
@@ -26,9 +27,6 @@ interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArguments {
 
 export class KratosDebugSession extends LoggingDebugSession {
 
-	// we don't support multiple threads, so we can use a hardcoded ID for the default thread
-	private static THREAD_ID = 1;
-
 	private _runtime: KratosRuntime;
 	public runtime(): KratosRuntime { return this._runtime; }
 
@@ -37,6 +35,29 @@ export class KratosDebugSession extends LoggingDebugSession {
 	private _configurationDone = new Subject();
 
 	private _cancellationTokens = new Map<number, boolean>();
+
+	private _threads: Array<Thread> = [new Thread(0, "Thread 0")];
+
+	/* handle scope request */
+	public async getScope(editor: vscode.TextEditor) {
+		const filename = editor.document.fileName;
+		const selection = editor.selection;
+		if (selection.isEmpty) {
+			const line_num = selection.active.line;
+
+			await this._runtime.getScope(filename, line_num);
+			// create threads accordingly
+			this._threads = [];
+			const names = this._runtime.getCurrentGeneratorNames();
+			for (let i = 0; i < names.length; i++) {
+				this._threads.push(new Thread(i, names[i]));
+			}
+			for (let i = 0; i < names.length; i++) {
+				// fire events to upgrade the scope variable
+				this.sendEvent(new StoppedEvent('data breakpoint', i));
+			}
+		}
+	}
 
 	/**
 	 * Creates a new debug adapter that is used for one debug session.
@@ -51,26 +72,37 @@ export class KratosDebugSession extends LoggingDebugSession {
 
 		this._runtime = new KratosRuntime();
 
+		let sendEventThread = (c: any, name: string) => {
+			for (let i = 0; i < this._threads.length; i++) {
+				this.sendEvent(new c(name, i));
+			}
+		};
+
 		// setup event handlers
 		this._runtime.on('stopOnEntry', () => {
-			this.sendEvent(new StoppedEvent('entry', KratosDebugSession.THREAD_ID));
+			sendEventThread(StoppedEvent, 'entry');
 		});
 		// TODO
 		// implement this
 		this._runtime.on('stopOnStep', () => {
-			this.sendEvent(new StoppedEvent('step', KratosDebugSession.THREAD_ID));
+			this._threads = [new Thread(0, "Thread 0")];
+			sendEventThread(StoppedEvent, 'step');
 		});
 		this._runtime.on('stopOnBreakpoint', () => {
-			this.sendEvent(new StoppedEvent('breakpoint', KratosDebugSession.THREAD_ID));
+			this._threads = [new Thread(0, "Thread 0")];
+			this.sendEvent(new StoppedEvent('breakpoint', 0));
 		});
 		this._runtime.on('stopOnPause', () => {
-			this.sendEvent(new StoppedEvent('pause', KratosDebugSession.THREAD_ID));
+			this._threads = [new Thread(0, "Thread 0")];
+			sendEventThread(StoppedEvent, 'pause');
 		});
 		this._runtime.on('stopOnDataBreakpoint', () => {
-			this.sendEvent(new StoppedEvent('data breakpoint', KratosDebugSession.THREAD_ID));
+			this._threads = [new Thread(0, "Thread 0")];
+			this.sendEvent(new StoppedEvent('data breakpoint', 0));
 		});
 		this._runtime.on('stopOnException', () => {
-			this.sendEvent(new StoppedEvent('exception', KratosDebugSession.THREAD_ID));
+			this._threads = [new Thread(0, "Thread 0")];
+			this.sendEvent(new StoppedEvent('exception', 0));
 		});
 		this._runtime.on('breakpointValidated', (bp: KratosBreakpoint) => {
 			this.sendEvent(new BreakpointEvent('changed', <DebugProtocol.Breakpoint>{ verified: bp.valid, id: bp.id }));
@@ -212,34 +244,42 @@ export class KratosDebugSession extends LoggingDebugSession {
 	}
 
 	protected threadsRequest(response: DebugProtocol.ThreadsResponse): void {
-
-		// runtime supports no threads so just return a default thread.
 		response.body = {
-			threads: [
-				new Thread(KratosDebugSession.THREAD_ID, "thread 1")
-			]
+			threads: this._threads
 		};
 		this.sendResponse(response);
 	}
 
 	protected stackTraceRequest(response: DebugProtocol.StackTraceResponse, args: DebugProtocol.StackTraceArguments) {
-
 		const stk = this._runtime.stack();
+		const thread_id = args.threadId;
+		if (stk.count === 0) {
+			response.body = {
+				stackFrames: [],
+				totalFrames: 0
+			};
+		} else {
+			const f = stk.frames[thread_id];
+			response.body = {
+				stackFrames: [new StackFrame(f.index, f.name, this.createSource(f.file), this.convertDebuggerLineToClient(f.line))],
+				totalFrames: 1
+			};
+		}
+		// different hardware threads are exposed as different stack frames
+		// we use the thread ID as frame id, hence passing down the threads to the downstream
 
-		response.body = {
-			stackFrames: stk.frames.map((f: { index: number; name: string; file: string; line: number; }) => new StackFrame(f.index, f.name, this.createSource(f.file), this.convertDebuggerLineToClient(f.line))),
-			totalFrames: stk.count
-		};
 		this.sendResponse(response);
 	}
 
 	protected scopesRequest(response: DebugProtocol.ScopesResponse, args: DebugProtocol.ScopesArguments): void {
+		// we use frameId as threa id; see the comments above
+		const thread_id = args.frameId;
 
 		response.body = {
 			scopes: [
-				new Scope("Local", this._variableHandles.create("local"), false),
-				new Scope("Generator Variables", this._variableHandles.create("generator"), false),
-				new Scope("Simulator Values", this._variableHandles.create("global"), true)
+				new Scope("Local", this._variableHandles.create(`local-${thread_id}`), false),
+				new Scope("Generator Variables", this._variableHandles.create(`generator-${thread_id}`), false),
+				new Scope("Simulator Values", this._variableHandles.create(`global-${thread_id}`), true)
 			]
 		};
 		this.sendResponse(response);
@@ -249,11 +289,31 @@ export class KratosDebugSession extends LoggingDebugSession {
 
 		const variables: DebugProtocol.Variable[] = [];
 
-		const id = this._variableHandles.get(args.variablesReference);
+		const raw_id = this._variableHandles.get(args.variablesReference);
+		const raw_tokens = raw_id.split('-');
+		if (raw_tokens.length !== 2) {
+			vscode.window.showErrorMessage("Unable to parse stack variable ID");
+			//need to return an empty response
+			response.body = {
+				variables: variables
+			};
+			this.sendResponse(response);
+			return;
+		}
+		const id: string = raw_tokens[0];
+		const thread_id: number = parseInt(raw_tokens[1]);
 
-		// 0 is local
+		// sanity check if there is no variable available
+		if (thread_id >= this._runtime.getCurrentLocalVariables().length) {
+			response.body = {
+				variables: variables
+			};
+			this.sendResponse(response);
+			return;
+		}
+
 		if (id === "local") {
-			const vars = this._runtime.getCurrentLocalVariables();
+			const vars = this._runtime.getCurrentLocalVariables()[thread_id];
 			let handles = new Set<string>();
 			vars.forEach((value: string, name: string) => {
 				// determine whether the name has any dot in it
@@ -292,7 +352,7 @@ export class KratosDebugSession extends LoggingDebugSession {
 				});
 			});
 		} else if (id === "generator") {
-			const vars = this._runtime.getCurrentGeneratorVariables();
+			const vars = this._runtime.getCurrentGeneratorVariables()[thread_id];
 			vars.forEach((value: string, name: string) => {
 				variables.push({
 					name: name,
@@ -303,7 +363,7 @@ export class KratosDebugSession extends LoggingDebugSession {
 			});
 		} else {
 			// we run a query to figure out any lower level
-			const vars = this._runtime.getCurrentLocalVariables();
+			const vars = this._runtime.getCurrentLocalVariables()[thread_id];
 			// we will include the dot here
 			const id_name = id + ".";
 			let handles = new Set<string>();
