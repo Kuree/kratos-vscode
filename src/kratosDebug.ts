@@ -14,7 +14,7 @@ interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArguments {
 	/** An absolute path to the "program" to debug. */
 	program: string;
 	/* runtime IP */
-	runtimeIP :string;
+	runtimeIP: string;
 	runtimePort: number;
 	/** Automatically stop target after launch. If not specified, target does not stop. */
 	stopOnEntry?: boolean;
@@ -47,15 +47,18 @@ export class KratosDebugSession extends LoggingDebugSession {
 
 			await this._runtime.getScope(filename, line_num);
 			// create threads accordingly
+			// clean up the current threads
+			for (let i = 0; i < this._threads.length; i++) {
+				this.sendEvent(new ThreadEvent('exited', this._threads[i].id));
+			}
 			this._threads = [];
 			const names = this._runtime.getCurrentGeneratorNames();
-			for (let i = 0; i < names.length; i++) {
-				this._threads.push(new Thread(i, names[i]));
-			}
-			for (let i = 0; i < names.length; i++) {
-				// fire events to upgrade the scope variable
-				this.sendEvent(new StoppedEvent('data breakpoint', i));
-			}
+			names.forEach((name: string, instance_id: number) => {
+				this._threads.push(new Thread(instance_id, name));
+			});
+			names.forEach((_: string, instance_id: number) => {
+				this.sendEvent(new StoppedEvent('data breakpoint', instance_id));
+			});
 		}
 	}
 
@@ -74,7 +77,7 @@ export class KratosDebugSession extends LoggingDebugSession {
 
 		let sendEventThread = (c: any, name: string) => {
 			for (let i = 0; i < this._threads.length; i++) {
-				this.sendEvent(new c(name, i));
+				this.sendEvent(new c(name, this._threads[i].id));
 			}
 		};
 
@@ -147,7 +150,7 @@ export class KratosDebugSession extends LoggingDebugSession {
 
 		// make VS Code to support completion in REPL
 		response.body.supportsCompletionsRequest = false;
-		response.body.completionTriggerCharacters = [ ".", "[" ];
+		response.body.completionTriggerCharacters = [".", "["];
 
 		// make VS Code to send cancelRequests
 		response.body.supportsCancelRequest = true;
@@ -184,14 +187,14 @@ export class KratosDebugSession extends LoggingDebugSession {
 
 		// wait until configuration has finished (and configurationDoneRequest has been called)
 		await this._configurationDone.wait(1000);
-		
+
 		// set the runtime configuration
 		this._runtime.setRuntimeIP(args.runtimeIP);
 		this._runtime.setRuntimePort(args.runtimePort);
 
 		// set remote debugging
-		this._runtime.setSrcPath(args.srcPath? args.srcPath: "");
-		this._runtime.setDstPath(args.dstPath? args.dstPath: "");
+		this._runtime.setSrcPath(args.srcPath ? args.srcPath : "");
+		this._runtime.setDstPath(args.dstPath ? args.dstPath : "");
 
 		// start the program in the runtime
 		this._runtime.start(args.program, !!args.stopOnEntry);
@@ -210,8 +213,8 @@ export class KratosDebugSession extends LoggingDebugSession {
 		// set and verify breakpoint locations
 		const actualBreakpoints = breakpoints.map(l => {
 			const kratos_bp = this._runtime.setBreakPoint(path, this.convertClientLineToDebugger(l.line), l.condition);
-			const bp = <DebugProtocol.Breakpoint> new Breakpoint(kratos_bp.valid, this.convertDebuggerLineToClient(kratos_bp.line));
-			bp.id= kratos_bp.id;
+			const bp = <DebugProtocol.Breakpoint>new Breakpoint(kratos_bp.valid, this.convertDebuggerLineToClient(kratos_bp.line));
+			bp.id = kratos_bp.id;
 			return bp;
 		});
 
@@ -228,9 +231,9 @@ export class KratosDebugSession extends LoggingDebugSession {
 			this._runtime.getBreakpoints(args.source.path, this.convertClientLineToDebugger(args.line), (col) => {
 				response.body = {
 					breakpoints: [{
-							line: args.line,
-							column: this.convertDebuggerColumnToClient(col)
-						}]
+						line: args.line,
+						column: this.convertDebuggerColumnToClient(col)
+					}]
 				};
 				this.sendResponse(response);
 			});
@@ -251,18 +254,18 @@ export class KratosDebugSession extends LoggingDebugSession {
 	}
 
 	protected stackTraceRequest(response: DebugProtocol.StackTraceResponse, args: DebugProtocol.StackTraceArguments) {
-		const stk = this._runtime.stack();
+		// notice that thread ID is the instance id
 		const thread_id = args.threadId;
+		const stk = this._runtime.stack(thread_id);
 		if (stk.count === 0) {
 			response.body = {
 				stackFrames: [],
 				totalFrames: 0
 			};
 		} else {
-			const f = stk.frames[thread_id];
 			response.body = {
-				stackFrames: [new StackFrame(f.index, f.name, this.createSource(f.file), this.convertDebuggerLineToClient(f.line))],
-				totalFrames: 1
+				stackFrames: stk.frames.map((f: { index: number; name: string; file: string; line: number; }) => new StackFrame(f.index, f.name, this.createSource(f.file), this.convertDebuggerLineToClient(f.line))),
+				totalFrames: stk.count
 			};
 		}
 		// different hardware threads are exposed as different stack frames
@@ -273,13 +276,16 @@ export class KratosDebugSession extends LoggingDebugSession {
 
 	protected scopesRequest(response: DebugProtocol.ScopesResponse, args: DebugProtocol.ScopesArguments): void {
 		// we use frameId as threa id; see the comments above
-		const thread_id = args.frameId;
+		const raw_id = args.frameId;
+		const ids = KratosRuntime.get_instance_frame_id(raw_id);
+		const instance_id = ids[0];
+		const frame_id = ids[1];
 
 		response.body = {
 			scopes: [
-				new Scope("Local", this._variableHandles.create(`local-${thread_id}`), false),
-				new Scope("Generator Variables", this._variableHandles.create(`generator-${thread_id}`), false),
-				new Scope("Simulator Values", this._variableHandles.create(`global-${thread_id}`), true)
+				new Scope("Local", this._variableHandles.create(`local-${instance_id}-${frame_id}`), false),
+				new Scope("Generator Variables", this._variableHandles.create(`generator-${instance_id}-${frame_id}`), false),
+				new Scope("Simulator Values", this._variableHandles.create(`global--${instance_id}-${frame_id}`), true)
 			]
 		};
 		this.sendResponse(response);
@@ -290,8 +296,8 @@ export class KratosDebugSession extends LoggingDebugSession {
 		const variables: DebugProtocol.Variable[] = [];
 
 		const raw_id = this._variableHandles.get(args.variablesReference);
-		const raw_tokens = raw_id.split('-');
-		if (raw_tokens.length !== 2) {
+		const raw_tokens = raw_id.split('-').filter(n => n);
+		if (raw_tokens.length !== 3) {
 			vscode.window.showErrorMessage("Unable to parse stack variable ID");
 			//need to return an empty response
 			response.body = {
@@ -301,10 +307,11 @@ export class KratosDebugSession extends LoggingDebugSession {
 			return;
 		}
 		const id: string = raw_tokens[0];
-		const thread_id: number = parseInt(raw_tokens[1]);
+		const instance_id: number = parseInt(raw_tokens[1]);
+		const stack_id = parseInt(raw_tokens[2]);
 
 		// sanity check if there is no variable available
-		if (thread_id >= this._runtime.getCurrentLocalVariables().length) {
+		if (!this._runtime.getCurrentLocalVariables().has(instance_id)) {
 			response.body = {
 				variables: variables
 			};
@@ -313,37 +320,41 @@ export class KratosDebugSession extends LoggingDebugSession {
 		}
 
 		if (id === "local") {
-			const vars = this._runtime.getCurrentLocalVariables()[thread_id];
-			let handles = new Set<string>();
-			vars.forEach((value: string, name: string) => {
-				// determine whether the name has any dot in it
-				// this is top level
-				if (name.includes(".")) {
-					// only create handle for the first level
-					// we will handle them recursively
-					const handle_name = name.split(".")[0];
-					if (!handles.has(handle_name)) {
-						const ref = this._variableHandles.create(handle_name);
+			const instance_vars = this._runtime.getCurrentLocalVariables().get(instance_id);
+			if (instance_vars) {
+				const vars = instance_vars[stack_id];
+				let handles = new Set<string>();
+				vars.forEach((value: string, name: string) => {
+					// determine whether the name has any dot in it
+					// this is top level
+					if (name.includes(".")) {
+						// only create handle for the first level
+						// we will handle them recursively
+						const handle_name = name.split(".")[0];
+						if (!handles.has(handle_name)) {
+							const ref = this._variableHandles.create(handle_name);
+							variables.push({
+								name: handle_name,
+								type: "object",
+								value: "Object",
+								variablesReference: ref
+							});
+							handles.add(handle_name);
+						}
+					} else {
 						variables.push({
-							name: handle_name,
-							type: "object",
-							value: "Object",
-							variablesReference: ref
+							name: name,
+							type: "integer",
+							value: value,
+							variablesReference: 0
 						});
-						handles.add(handle_name);
 					}
-				} else {
-					variables.push({
-						name: name,
-						type: "integer",
-						value: value,
-						variablesReference: 0
-					});
-				}
-			});
+				});
+			}
+
 		} else if (id === "global") {
 			const vars = await this._runtime.getGlobalVariables();
-			vars.forEach((entry: {name: string, value: any}) => {
+			vars.forEach((entry: { name: string, value: any }) => {
 				variables.push({
 					name: entry.name,
 					type: "integer",
@@ -352,47 +363,54 @@ export class KratosDebugSession extends LoggingDebugSession {
 				});
 			});
 		} else if (id === "generator") {
-			const vars = this._runtime.getCurrentGeneratorVariables()[thread_id];
-			vars.forEach((value: string, name: string) => {
-				variables.push({
-					name: name,
-					type: "integer",
-					value: value,
-					variablesReference: 0
+			const gen_vars = this._runtime.getCurrentGeneratorVariables().get(instance_id);
+			if (gen_vars) {
+				const vars = gen_vars[stack_id];
+				vars.forEach((value: string, name: string) => {
+					variables.push({
+						name: name,
+						type: "integer",
+						value: value,
+						variablesReference: 0
+					});
 				});
-			});
+			}
+
 		} else {
 			// we run a query to figure out any lower level
-			const vars = this._runtime.getCurrentLocalVariables()[thread_id];
-			// we will include the dot here
-			const id_name = id + ".";
-			let handles = new Set<string>();
-			vars.forEach((value: string, name: string) => {
-				if (name.length >= id_name.length && name.substr(0, id_name.length) === id_name) {
-					const sub_name = name.substr(id_name.length);
-					if (sub_name.includes(".")) {
-						const next_name = sub_name.split(".")[0];
-						if (!handles.has(next_name)) {
-							const ref = this._variableHandles.create(id_name + next_name);
+			const instance_vars = this._runtime.getCurrentLocalVariables().get(instance_id);
+			if (instance_vars) {
+				const vars = instance_vars[stack_id];
+				// we will include the dot here
+				const id_name = id + ".";
+				let handles = new Set<string>();
+				vars.forEach((value: string, name: string) => {
+					if (name.length >= id_name.length && name.substr(0, id_name.length) === id_name) {
+						const sub_name = name.substr(id_name.length);
+						if (sub_name.includes(".")) {
+							const next_name = sub_name.split(".")[0];
+							if (!handles.has(next_name)) {
+								const ref = this._variableHandles.create(id_name + next_name);
+								variables.push({
+									name: next_name,
+									type: "object",
+									value: "Object",
+									variablesReference: ref
+								});
+								handles.add(next_name);
+							}
+						} else {
+							// that's it
 							variables.push({
-								name: next_name,
-								type: "object",
-								value: "Object",
-								variablesReference: ref
+								name: sub_name,
+								type: "integer",
+								value: value,
+								variablesReference: 0
 							});
-							handles.add(next_name);
 						}
-					} else {
-						// that's it
-						variables.push({
-							name: sub_name,
-							type: "integer",
-							value: value,
-							variablesReference: 0
-						});
 					}
-				}
-			});
+				});
+			}
 		}
 
 		response.body = {
@@ -401,7 +419,7 @@ export class KratosDebugSession extends LoggingDebugSession {
 		this.sendResponse(response);
 	}
 
-	protected evaluateRequest( response:DebugProtocol.EvaluateResponse, args:DebugProtocol.EvaluateArguments ): void {
+	protected evaluateRequest(response: DebugProtocol.EvaluateResponse, args: DebugProtocol.EvaluateArguments): void {
 	}
 
 	protected continueRequest(response: DebugProtocol.ContinueResponse, args: DebugProtocol.ContinueArguments): void {

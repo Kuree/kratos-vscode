@@ -11,6 +11,7 @@ export class ContextKey {
 
 	constructor(name: string) {
 		this._name = name;
+		this._lastValue = false;
 	}
 
 	public set(value: boolean): void {

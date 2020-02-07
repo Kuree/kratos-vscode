@@ -26,9 +26,9 @@ export class KratosRuntime extends EventEmitter {
 	private _breakpointId = 1;
 
 	private _current_breakpoint_id = -1;
-	private _current_local_variables = new Array<Map<string, string>>();
-	private _current_generator_names = new Array<string>();
-	private _current_generator_variables = new Array<Map<string, string>>();
+	private _current_local_variables = new Map<number, Array<Map<string, string>>>();
+	private _current_generator_names = new Map<number, string>();
+	private _current_generator_variables = new Map<number, Array<Map<string, string>>>();
 
 	// need to pull this from configuration
 	private _runtimeIP = "0.0.0.0";
@@ -72,9 +72,9 @@ export class KratosRuntime extends EventEmitter {
 	}
 
 	private on_breakpoint(req, res, is_exception = false) {
-		this._current_local_variables = [];
-		this._current_generator_variables = [];
-		this._current_generator_names = [];
+		this._current_local_variables.clear();
+		this._current_generator_variables.clear();
+		this._current_generator_names.clear();
 		// we will get a list of values
 		var payload: Array<string> = req.body;
 		const id = this.add_frame_info(payload);
@@ -111,7 +111,7 @@ export class KratosRuntime extends EventEmitter {
 			// get the values as well
 			const values = req.body.value;
 			if (typeof this._onClockEdge !== 'undefined') {
-				this._onClockEdge({time: time, value: values});
+				this._onClockEdge({ time: time, value: values });
 				this.sendEvent("stopOnDataBreakpoint");
 			}
 		});
@@ -182,6 +182,7 @@ export class KratosRuntime extends EventEmitter {
 		var self: Object = payload["self"];
 		var generator: Object = payload["generator"];
 		var id = Number.parseInt(payload["id"]);
+		var instance_id = Number.parseInt(payload["instance_id"]);
 		this._current_filename = payload["filename"];
 		this._current_line_num = Number.parseInt(payload["line_num"]);
 		this._current_breakpoint_id = id;
@@ -189,12 +190,24 @@ export class KratosRuntime extends EventEmitter {
 		const local_variables = new Map<string, string>(Object.entries(local));
 		const self_variable = new Map<string, string>(Object.entries(self));
 		// merge this two
-		this._current_local_variables.push(new Map<string, string>([...local_variables, ...self_variable]));
+		var vars = this._current_local_variables.get(instance_id);
+		const new_var = new Map<string, string>([...local_variables, ...self_variable]);
+		if (vars) {
+			vars.push(new_var);
+		} else {
+			this._current_local_variables.set(instance_id, [new_var]);
+		}
+		var gen_vars = this._current_generator_variables.get(instance_id);
+		const new_gen_var = new Map<string, string>(Object.entries(generator));
+		if (gen_vars) {
+			gen_vars.push(new_gen_var);
+		} else {
+			this._current_generator_variables.set(instance_id, [new_gen_var]);
+		}
 		// get instance name
 		const instance_name = payload["instance_name"];
 		generator["instance_name"] = instance_name;
-		this._current_generator_names.push(instance_name);
-		this._current_generator_variables.push(new Map<string, string>(Object.entries(generator)));
+		this._current_generator_names.set(instance_id, instance_name);
 		return id;
 	}
 
@@ -209,14 +222,14 @@ export class KratosRuntime extends EventEmitter {
 			request(options, (_, res, __) => {
 				if (res.statusCode === 200) {
 					const values = res.body;
-					this._current_local_variables = [];
-					this._current_generator_variables = [];
-					this._current_generator_names = [];
+					this._current_local_variables.clear();
+					this._current_generator_variables.clear();
+					this._current_generator_names.clear();
 					for (let i = 0; i < values.length; i++) {
 						const payload = JSON.parse(values[i]);
 						this.add_frame_info(payload);
 					}
-				    resolve();
+					resolve();
 				} else {
 					reject();
 				}
@@ -331,27 +344,51 @@ export class KratosRuntime extends EventEmitter {
 		});
 	}
 
-	public stack() {
+	public static get_frame_id(instance_id: number, stack_index: number): number {
+		// notice that we need to store instance id and stack index into a single
+		// number
+		// since in JS the number is 2^53, according to
+		// https://stackoverflow.com/a/4375743
+		// we store the lower 13 bits as stack index and the reset high bits
+		// as instance_id. this should give us enough space for all millions of
+		// instances and different stack frames
+		return instance_id << 13 | stack_index;
+	}
+
+	public static get_instance_frame_id(frame_id: number): [number, number] {
+		const instance_id = frame_id >> 13;
+		const stack_index = frame_id & ((1 << 14) - 1);
+		return [instance_id, stack_index];
+	}
+
+	public stack(instance_id: number) {
 		// we only have one stack frame
 		var frames: Array<any> = [];
-		const num_frames = this._current_local_variables.length;
-		if (this._current_breakpoint_id >= 0) {
+		const frames_infos = this._current_local_variables.get(instance_id);
+		if (!frames_infos) {
+			// empty stack
+			return {
+				frames: frames,
+				count: 0
+			};
+		} else {
+			const num_frames = frames_infos.length;
 			const filename = this.current_filename();
 			const line_num = this.current_num();
 			for (let i = 0; i < num_frames; i++) {
 				frames.push({
-					index: i,
-					name: "Instance " + this._current_generator_names[i],
+					index: KratosRuntime.get_frame_id(instance_id, i),
+					name: `Scope ${i}`,
 					file: filename,
-					line: line_num
+					line: line_num + 1
 				});
 			}
-
+			return {
+				frames: frames,
+				count: num_frames
+			};
 		}
-		return {
-			frames: frames,
-			count: num_frames
-		};
+
 	}
 
 	public stopOnSync() {
@@ -374,9 +411,9 @@ export class KratosRuntime extends EventEmitter {
 					const value = JSON.parse(res.body);
 					const values = value.value;
 					if (typeof values !== 'undefined') {
-						resolve({name: value.name, value: values.value});
+						resolve({ name: value.name, value: values.value });
 					} else {
-						resolve({name: value.name});
+						resolve({ name: value.name });
 					}
 				} else {
 					reject();
@@ -423,7 +460,7 @@ export class KratosRuntime extends EventEmitter {
 	}
 
 	public sendPauseOnClock(value: Boolean) {
-		var str = value? "on": "off";
+		var str = value ? "on" : "off";
 		var url = `http://${this._runtimeIP}:${this._runtimePort}/clock/${str}`;
 		request.post(url);
 	}
@@ -454,9 +491,11 @@ export class KratosRuntime extends EventEmitter {
 
 	private async sendRemoveBreakpoints(filename: string) {
 		var url = `http://${this._runtimeIP}:${this._runtimePort}/breakpoint/file/${filename}`;
-		return new Promise<void>((resolve, _) => {request.delete(url, () => {
-			resolve();
-		});});
+		return new Promise<void>((resolve, _) => {
+			request.delete(url, () => {
+				resolve();
+			});
+		});
 	}
 
 	private async connectRuntime(file: string) {
