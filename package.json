@@ -120,10 +120,7 @@
         "command": "kratos.stopOnSync",
         "title": "Enter Kratos design scope",
         "category": "Kratos",
-        "icon": {
-					"light": "$(search)",
-					"dark": "$(search)"
-				}
+        "icon": "$(zap)"
       }
     ],
     "menus": {

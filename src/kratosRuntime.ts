@@ -25,7 +25,7 @@ export class KratosRuntime extends EventEmitter {
 	// so that the frontend can match events with breakpoints.
 	private _breakpointId = 1;
 
-	private _current_breakpoint_id = -1;
+	private _current_breakpoint_instance_id = 0;
 	private _current_local_variables = new Map<number, Array<Map<string, string>>>();
 	private _current_generator_names = new Map<number, string>();
 	private _current_generator_variables = new Map<number, Array<Map<string, string>>>();
@@ -60,6 +60,8 @@ export class KratosRuntime extends EventEmitter {
 	public getCurrentGeneratorVariables() { return this._current_generator_variables; }
 	public getCurrentGeneratorNames() { return this._current_generator_names; }
 
+	public getCurrentBreakpointInstanceId() { return this._current_breakpoint_instance_id; }
+
 	public setRuntimeIP(ip: string) { this._runtimeIP = ip; }
 	public setRuntimePort(port: number) { this._runtimePort = port; }
 
@@ -78,6 +80,7 @@ export class KratosRuntime extends EventEmitter {
 		// we will get a list of values
 		var payload: Array<string> = req.body;
 		const id = this.add_frame_info(payload);
+		// recreate threads
 		if (!is_exception) {
 			this.fireEventsForBreakPoint(id);
 		} else {
@@ -143,9 +146,9 @@ export class KratosRuntime extends EventEmitter {
 			this.sendEvent('end');
 		});
 
-		// on synth
-		this._app.post("/status/synth", (_, __) => {
-			// allow synth
+		// on synch
+		this._app.post("/status/synch", (_, __) => {
+			// allow synch
 			this.stoppedOnSync();
 		});
 
@@ -185,7 +188,7 @@ export class KratosRuntime extends EventEmitter {
 		var instance_id = Number.parseInt(payload["instance_id"]);
 		this._current_filename = payload["filename"];
 		this._current_line_num = Number.parseInt(payload["line_num"]);
-		this._current_breakpoint_id = id;
+		this._current_breakpoint_instance_id = instance_id;
 		// conver them into the format and store them
 		const local_variables = new Map<string, string>(Object.entries(local));
 		const self_variable = new Map<string, string>(Object.entries(self));
@@ -357,7 +360,7 @@ export class KratosRuntime extends EventEmitter {
 
 	public static get_instance_frame_id(frame_id: number): [number, number] {
 		const instance_id = frame_id >> 13;
-		const stack_index = frame_id & ((1 << 14) - 1);
+		const stack_index = frame_id & ((1 << 13) - 1);
 		return [instance_id, stack_index];
 	}
 
@@ -380,7 +383,7 @@ export class KratosRuntime extends EventEmitter {
 					index: KratosRuntime.get_frame_id(instance_id, i),
 					name: `Scope ${i}`,
 					file: filename,
-					line: line_num + 1
+					line: line_num
 				});
 			}
 			return {
@@ -392,7 +395,7 @@ export class KratosRuntime extends EventEmitter {
 	}
 
 	public stopOnSync() {
-		var url = `http://${this._runtimeIP}:${this._runtimePort}/clock/synth`;
+		var url = `http://${this._runtimeIP}:${this._runtimePort}/clock/synch`;
 		request.post(url);
 	}
 

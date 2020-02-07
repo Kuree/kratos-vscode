@@ -43,7 +43,7 @@ export class KratosDebugSession extends LoggingDebugSession {
 		const filename = editor.document.fileName;
 		const selection = editor.selection;
 		if (selection.isEmpty) {
-			const line_num = selection.active.line;
+			const line_num = selection.active.line + 1;
 
 			await this._runtime.getScope(filename, line_num);
 			// create threads accordingly
@@ -85,19 +85,16 @@ export class KratosDebugSession extends LoggingDebugSession {
 		this._runtime.on('stopOnEntry', () => {
 			sendEventThread(StoppedEvent, 'entry');
 		});
-		// TODO
-		// implement this
 		this._runtime.on('stopOnStep', () => {
-			this._threads = [new Thread(0, "Thread 0")];
 			sendEventThread(StoppedEvent, 'step');
 		});
 		this._runtime.on('stopOnBreakpoint', () => {
-			this._threads = [new Thread(0, "Thread 0")];
-			this.sendEvent(new StoppedEvent('breakpoint', 0));
-		});
-		this._runtime.on('stopOnPause', () => {
-			this._threads = [new Thread(0, "Thread 0")];
-			sendEventThread(StoppedEvent, 'pause');
+			// clean up the current threads
+			for (let i = 0; i < this._threads.length; i++) {
+				this.sendEvent(new ThreadEvent('exited', this._threads[i].id));
+			}
+			this._threads = [new Thread(this._runtime.getCurrentBreakpointInstanceId(), "Thread 0")];
+			this.sendEvent(new StoppedEvent('breakpoint', this._runtime.getCurrentBreakpointInstanceId()));
 		});
 		this._runtime.on('stopOnDataBreakpoint', () => {
 			this._threads = [new Thread(0, "Thread 0")];
