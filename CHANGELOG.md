@@ -6,6 +6,11 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 
 ## [Unreleased]
+
+## [0.0.4] - 2020/02/07
+### Added
+- Add support to look around synch state
+
 ## [0.0.3] - 2020/02/02
 ### Added
 - Add path translation for remote debugging support
