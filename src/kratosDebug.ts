@@ -294,14 +294,28 @@ export class KratosDebugSession extends LoggingDebugSession {
 
 		const raw_id = this._variableHandles.get(args.variablesReference);
 		const raw_tokens = raw_id.split('-').filter(n => n);
+		let is_generator: boolean = false;
 		if (raw_tokens.length !== 3) {
-			vscode.window.showErrorMessage("Unable to parse stack variable ID");
-			//need to return an empty response
-			response.body = {
-				variables: variables
-			};
-			this.sendResponse(response);
-			return;
+			let has_error = true;
+			if (raw_tokens.length === 4) {
+				if (raw_tokens[3] === "local") {
+					is_generator = false;
+					has_error = false;
+				} else if (raw_tokens[3] === "generator") {
+					is_generator = true;
+					has_error = false;
+				}
+			}
+			if (has_error) {
+				vscode.window.showErrorMessage("Unable to parse stack variable ID");
+				//need to return an empty response
+				response.body = {
+					variables: variables
+				};
+				this.sendResponse(response);
+				return;
+			}
+
 		}
 		const id: string = raw_tokens[0];
 		const instance_id: number = parseInt(raw_tokens[1]);
@@ -324,28 +338,7 @@ export class KratosDebugSession extends LoggingDebugSession {
 				vars.forEach((value: string, name: string) => {
 					// determine whether the name has any dot in it
 					// this is top level
-					if (name.includes(".")) {
-						// only create handle for the first level
-						// we will handle them recursively
-						const handle_name = name.split(".")[0];
-						if (!handles.has(handle_name)) {
-							const ref = this._variableHandles.create(`${id}-${instance_id}-${handle_name}`);
-							variables.push({
-								name: handle_name,
-								type: "object",
-								value: "Object",
-								variablesReference: ref
-							});
-							handles.add(handle_name);
-						}
-					} else {
-						variables.push({
-							name: name,
-							type: "integer",
-							value: value,
-							variablesReference: 0
-						});
-					}
+					this.processNestedScope(name, handles, instance_id, stack_id, variables, value, false);
 				});
 			}
 
@@ -363,19 +356,16 @@ export class KratosDebugSession extends LoggingDebugSession {
 			const gen_vars = this._runtime.getCurrentGeneratorVariables().get(instance_id);
 			if (gen_vars) {
 				const vars = gen_vars[stack_id];
+				let handles = new Set<string>();
 				vars.forEach((value: string, name: string) => {
-					variables.push({
-						name: name,
-						type: "integer",
-						value: value,
-						variablesReference: 0
-					});
+					this.processNestedScope(name, handles, instance_id, stack_id, variables, value, true);
 				});
 			}
 
 		} else {
 			// we run a query to figure out any lower level
-			const instance_vars = this._runtime.getCurrentLocalVariables().get(instance_id);
+			const instance_vars = is_generator? this._runtime.getCurrentGeneratorVariables().get(instance_id):
+							this._runtime.getCurrentLocalVariables().get(instance_id);
 			if (instance_vars) {
 				const vars = instance_vars[stack_id];
 				// we will include the dot here
@@ -383,21 +373,31 @@ export class KratosDebugSession extends LoggingDebugSession {
 				let handles = new Set<string>();
 				vars.forEach((value: string, name: string) => {
 					if (name.length >= id_name.length && name.substr(0, id_name.length) === id_name) {
-						const sub_name = name.substr(id_name.length);
+						let sub_name = name.substr(id_name.length);
 						if (sub_name.includes(".")) {
-							const next_name = sub_name.split(".")[0];
+							let next_name = sub_name.split(".")[0];
 							if (!handles.has(next_name)) {
-								const ref = this._variableHandles.create(`${id}-${instance_id}-` + id_name + next_name);
+								let handle_name = id_name + next_name;
+								let suffix = is_generator? "generator": "local";
+								const ref = this._variableHandles.create(`${handle_name}-${instance_id}-${stack_id}-${suffix}`);
+								let value = "Object";
+								if (!isNaN(Number(next_name))) {
+									value = "Array";
+									next_name = `[${next_name}]`;
+								}
 								variables.push({
 									name: next_name,
 									type: "object",
-									value: "Object",
+									value: value,
 									variablesReference: ref
 								});
 								handles.add(next_name);
 							}
 						} else {
 							// that's it
+							if (!isNaN(Number(sub_name))) {
+								sub_name = `[${sub_name}]`;
+							}
 							variables.push({
 								name: sub_name,
 								type: "integer",
@@ -414,6 +414,40 @@ export class KratosDebugSession extends LoggingDebugSession {
 			variables: variables
 		};
 		this.sendResponse(response);
+	}
+
+	private processNestedScope(name: string, handles: Set<string>, instance_id: number, stack_id: number,
+		                       variables: DebugProtocol.Variable[], value: string, isGenerator: Boolean) {
+		if (name.includes(".")) {
+			// only create handle for the first level
+			// we will handle them recursively
+			let name_tokens = name.split(".");
+			let handle_name = name_tokens[0];
+			const next_name = name_tokens[1];
+			let suffix = isGenerator? "generator": "local";
+			if (!handles.has(handle_name)) {
+				const ref = this._variableHandles.create(`${handle_name}-${instance_id}-${stack_id}-${suffix}`);
+				let value = "Object";
+				if (!isNaN(Number(next_name))) {
+					value = "Array";
+				}
+				variables.push({
+					name: handle_name,
+					type: "object",
+					value: value,
+					variablesReference: ref
+				});
+				handles.add(handle_name);
+			}
+		}
+		else {
+			variables.push({
+				name: name,
+				type: "integer",
+				value: value,
+				variablesReference: 0
+			});
+		}
 	}
 
 	protected evaluateRequest(response: DebugProtocol.EvaluateResponse, args: DebugProtocol.EvaluateArguments): void {

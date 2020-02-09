@@ -189,7 +189,7 @@ export class KratosRuntime extends EventEmitter {
 		this._current_filename = payload["filename"];
 		this._current_line_num = Number.parseInt(payload["line_num"]);
 		this._current_breakpoint_instance_id = instance_id;
-		// conver them into the format and store them
+		// convert them into the format and store them
 		const local_variables = new Map<string, string>(Object.entries(local));
 		const self_variable = new Map<string, string>(Object.entries(self));
 		// merge this two
