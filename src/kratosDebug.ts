@@ -329,7 +329,7 @@ export class KratosDebugSession extends LoggingDebugSession {
 						// we will handle them recursively
 						const handle_name = name.split(".")[0];
 						if (!handles.has(handle_name)) {
-							const ref = this._variableHandles.create(handle_name);
+							const ref = this._variableHandles.create(`${id}-${instance_id}-${handle_name}`);
 							variables.push({
 								name: handle_name,
 								type: "object",
@@ -387,7 +387,7 @@ export class KratosDebugSession extends LoggingDebugSession {
 						if (sub_name.includes(".")) {
 							const next_name = sub_name.split(".")[0];
 							if (!handles.has(next_name)) {
-								const ref = this._variableHandles.create(id_name + next_name);
+								const ref = this._variableHandles.create(`${id}-${instance_id}-` + id_name + next_name);
 								variables.push({
 									name: next_name,
 									type: "object",
