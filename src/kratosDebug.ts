@@ -375,15 +375,29 @@ export class KratosDebugSession extends LoggingDebugSession {
 					if (name.length >= id_name.length && name.substr(0, id_name.length) === id_name) {
 						let sub_name = name.substr(id_name.length);
 						if (sub_name.includes(".")) {
-							let next_name = sub_name.split(".")[0];
+							const name_tokens = sub_name.split(".");
+							let next_name = name_tokens[0];
 							if (!handles.has(next_name)) {
 								let handle_name = id_name + next_name;
 								let suffix = is_generator? "generator": "local";
 								const ref = this._variableHandles.create(`${handle_name}-${instance_id}-${stack_id}-${suffix}`);
 								let value = "Object";
-								if (!isNaN(Number(next_name))) {
+								let is_array = false;
+								if (id !== "self") {
+									if (!isNaN(Number(next_name))) {
+										is_array = true;
+									}
+								} else if (id === "self" && name_tokens.length > 1) {
+									const n_next_name = name_tokens[1];
+									if (!isNaN(Number(n_next_name))) {
+										is_array = true;
+									}
+								}
+								if (is_array) {
 									value = "Array";
-									next_name = `[${next_name}]`;
+									if (!isNaN(Number(next_name))) {
+										next_name = `[${next_name}]`;
+									}
 								}
 								variables.push({
 									name: next_name,
@@ -423,7 +437,7 @@ export class KratosDebugSession extends LoggingDebugSession {
 			// we will handle them recursively
 			let name_tokens = name.split(".");
 			let handle_name = name_tokens[0];
-			const next_name = name_tokens[1];
+			let next_name = name_tokens[1];
 			let suffix = isGenerator? "generator": "local";
 			if (!handles.has(handle_name)) {
 				const ref = this._variableHandles.create(`${handle_name}-${instance_id}-${stack_id}-${suffix}`);
