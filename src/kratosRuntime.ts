@@ -503,7 +503,18 @@ export class KratosRuntime extends EventEmitter {
 
 	private async connectRuntime(file: string) {
 		// resolve it to make it absolute path
-		file = path.resolve(file);
+		if (file.charAt(0) !== '/') {
+			// using workplace folder
+			let work_dirs = vscode.workspace.workspaceFolders;
+			if (work_dirs) {
+				if (work_dirs.length > 1) {
+					// too many workspace and unable to resolve
+					return vscode.window.showErrorMessage(`Too many workspace opened. Unable to resolve ${file}`);
+				}
+				file = path.join(work_dirs[0].uri.path, file);
+			}
+		}
+
 		const ip = await utils.get_ip();
 		var payload = { ip: ip, port: this._debuggerPort, database: file };
 		if (this._srcPath !== "" && this._dstPath !== "") {
@@ -527,6 +538,12 @@ export class KratosRuntime extends EventEmitter {
 					body = JSON.parse(body);
 					var opened_dirs = new Set<string>();
 					body.forEach((file: string) => {
+						// do a translation if possible
+						// notice that dst path is the one that's being used by server and
+						// src path is the one used by the user
+						if (file.indexOf(this._dstPath) >= 0) {
+							file = file.replace(this._dstPath, this._srcPath);
+						}
 						// need to open the workspace
 						var base_dir = path.dirname(file);
 						if (!opened_dirs.has(base_dir)) {

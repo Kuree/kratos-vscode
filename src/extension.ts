@@ -4,7 +4,6 @@ import * as vscode from 'vscode';
 import { WorkspaceFolder, DebugConfiguration, ProviderResult, CancellationToken, commands} from 'vscode';
 import { KratosDebugSession } from './kratosDebug';
 import * as Net from 'net';
-import * as path from 'path';
 import { ModuleViewPanel} from './moduleView';
 import {ContextKey} from './utils';
 
@@ -102,37 +101,9 @@ class KratosConfigurationProvider implements vscode.DebugConfigurationProvider {
 			config.srcPath = "";
 		}
 
-		var promise: Array<Promise<string>> = [];
 		if (!config.program) {
-			// trying to find a db file in the current working directory
-			// make a promise
-			function findDirPromise(dir: vscode.WorkspaceFolder): Promise<string> {
-				return new Promise((resolve, _) => {
-					vscode.workspace.fs.readDirectory(dir.uri).then((files) => {
-						files.forEach((filename, _) => {
-							if (filename[0].split(".").pop() === "db") {
-								resolve(path.join(dir.uri.fsPath, filename[0]));
-							}
-						});
-					});
-				});
-			}
-			var folders = vscode.workspace.workspaceFolders;
-			if (folders) {
-				folders.forEach((dir: vscode.WorkspaceFolder) => {
-					promise.push(findDirPromise(dir));
-				});
-			}
-		}
-		const result = await Promise.all(promise);
-		if (result.length > 0) {
-			config.program = result[0];
-		}
-
-		if (!config.program && config.srcPath !== "") {
-			return vscode.window.showInformationMessage("Cannot find a program to debug").then(_ => {
-				return undefined;	// abort launch
-			});
+			vscode.window.showErrorMessage("Program name cannot be empty!");
+			throw vscode.FileSystemError.FileNotFound("${debug.db}");
 		}
 
 		return config;
