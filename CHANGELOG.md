@@ -7,6 +7,13 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## [Unreleased]
 
+## [0.0.5]
+### Added
+- Added complex object/array display
+
+### Changed
+- Remove debug db search logic to enable remote debugging
+
 ## [0.0.4] - 2020/02/07
 ### Added
 - Add support to look around synch state

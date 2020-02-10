@@ -3,7 +3,7 @@
   "displayName": "kratos-vscode",
   "description": "Debugger for kratos generators",
   "publisher": "keyiz",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "engines": {
     "vscode": "^1.33.0"
   },
