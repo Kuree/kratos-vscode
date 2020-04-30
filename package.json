@@ -132,12 +132,12 @@
         }
       ],
       "debug/toolbar": [
-				{
-					"command": "kratos.stopOnSync",
-					"group": "navigation",
-					"when": "debugType == kratos"
-				}
-			]
+        {
+          "command": "kratos.stopOnSync",
+          "group": "navigation",
+          "when": "debugType == kratos"
+        }
+      ]
     }
   },
   "scripts": {
