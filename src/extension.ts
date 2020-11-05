@@ -102,8 +102,17 @@ class KratosConfigurationProvider implements vscode.DebugConfigurationProvider {
 		}
 
 		if (!config.program) {
-			vscode.window.showErrorMessage("Program name cannot be empty!");
-			throw vscode.FileSystemError.FileNotFound("${debug.db}");
+			// try to get it again
+			await vscode.window.showInputBox({placeHolder: "Debug database filename", value: "debug.db"}).then((value) => {
+				if (value != undefined) {
+					config.program = value;
+				}
+			});
+			if (!config.program) {
+				vscode.window.showErrorMessage("Program name cannot be empty!");
+				return undefined;
+			}
+
 		}
 
 		return config;
