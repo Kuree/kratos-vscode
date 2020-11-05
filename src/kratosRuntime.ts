@@ -182,7 +182,6 @@ export class KratosRuntime extends EventEmitter {
 
 	private add_frame_info(payload: Object) {
 		var local: Object = payload["local"];
-		var self: Object = payload["self"];
 		var generator: Object = payload["generator"];
 		var id = Number.parseInt(payload["id"]);
 		var instance_id = Number.parseInt(payload["instance_id"]);
@@ -191,10 +190,9 @@ export class KratosRuntime extends EventEmitter {
 		this._current_breakpoint_instance_id = instance_id;
 		// convert them into the format and store them
 		const local_variables = new Map<string, string>(Object.entries(local));
-		const self_variable = new Map<string, string>(Object.entries(self));
 		// merge this two
 		var vars = this._current_local_variables.get(instance_id);
-		const new_var = new Map<string, string>([...local_variables, ...self_variable]);
+		const new_var = new Map<string, string>([...local_variables]);
 		if (vars) {
 			vars.push(new_var);
 		} else {
