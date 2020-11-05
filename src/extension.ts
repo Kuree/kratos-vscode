@@ -1,11 +1,11 @@
 'use strict';
 
 import * as vscode from 'vscode';
-import { WorkspaceFolder, DebugConfiguration, ProviderResult, CancellationToken, commands} from 'vscode';
+import { WorkspaceFolder, DebugConfiguration, ProviderResult, CancellationToken, commands } from 'vscode';
 import { KratosDebugSession } from './kratosDebug';
 import * as Net from 'net';
-import { ModuleViewPanel} from './moduleView';
-import {ContextKey} from './utils';
+import { ModuleViewPanel } from './moduleView';
+import { ContextKey } from './utils';
 
 
 export function activate(context: vscode.ExtensionContext) {
@@ -25,7 +25,7 @@ export function activate(context: vscode.ExtensionContext) {
 	const factory = new KratosDebugAdapterDescriptorFactory();
 	context.subscriptions.push(vscode.debug.registerDebugAdapterDescriptorFactory('kratos', factory));
 	context.subscriptions.push(factory);
-	
+
 	// this is for module viewer
 	context.subscriptions.push(
 		vscode.commands.registerCommand('kratosView.start', () => {
@@ -103,7 +103,7 @@ class KratosConfigurationProvider implements vscode.DebugConfigurationProvider {
 
 		if (!config.program) {
 			// try to get it again
-			await vscode.window.showInputBox({placeHolder: "Debug database filename", value: "debug.db"}).then((value) => {
+			await vscode.window.showInputBox({ placeHolder: "Debug database filename", value: "debug.db" }).then((value) => {
 				if (value != undefined) {
 					config.program = value;
 				}
