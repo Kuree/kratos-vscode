@@ -158,7 +158,8 @@
     "vscode-debugadapter-testsupport": "^1.37.1"
   },
   "dependencies": {
-    "@types/express": "^4.17.1",
+    "@types/express": "4.17.3",
+    "@types/express-serve-static-core": "4.17.3",
     "@types/internal-ip": "^4.1.0",
     "@types/request": "^2.48.3",
     "@types/string-template": "^1.0.2",
