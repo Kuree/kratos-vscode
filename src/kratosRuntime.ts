@@ -13,6 +13,7 @@ export interface KratosBreakpoint {
 	line: number;
 	filename: string;
 	valid: boolean;
+	column: number;
 }
 
 
@@ -20,10 +21,6 @@ export class KratosRuntime extends EventEmitter {
 
 	// maps from id to the actual breakpoint
 	private _breakPoints = new Map<number, KratosBreakpoint>();
-
-	// since we want to send breakpoint events, we will assign an id to every event
-	// so that the frontend can match events with breakpoints.
-	private _breakpointId = 1;
 
 	private _current_breakpoint_instance_id = 0;
 	private _current_local_variables = new Map<number, Array<Map<string, string>>>();
@@ -272,40 +269,46 @@ export class KratosRuntime extends EventEmitter {
 		this.run(true);
 	}
 
-
 	/*
-	 * Set breakpoint in file with given line.
+	 * Verify breakpoint in file with given line.
 	 */
-	public setBreakPoint(filename: string, line: number, expr?: string): KratosBreakpoint {
+	public async verifyBreakpoint(filename: string, line: number, column?: number, expr?: string): Promise<Array<KratosBreakpoint>> {
 		// get the absolute path
-		var filename = path.resolve(filename);
-		var bp = <KratosBreakpoint>{ valid: false, line, id: this._breakpointId++, filename: filename };
+		filename = path.resolve(filename);
+		let bps = new Array<KratosBreakpoint>();
 
+		if (!column) {
+			column = 0;
+		}
 		if (!expr) {
 			expr = "";
 		}
 
-		var payload = { filename: filename, line_num: line, expr: expr };
-		var url = `http://${this._runtimeIP}:${this._runtimePort}/breakpoint`;
-		var options = {
-			method: "post",
-			body: payload,
-			json: true,
-			url: url
+		let block_get = (u: string) => {
+			return new Promise((resolve, reject) => {
+				request.get(u, (_, res, body) => {
+					if (res.statusCode === 200) {
+						let bps_data = JSON.parse(body);
+						bps_data.forEach(e => {
+							let bp = <KratosBreakpoint>{ valid: true, line, id: e.id, filename: filename, column: e.col };
+							let id = bp.id;
+							this.sendEvent('breakpointValidated', bp);
+							this._breakPoints.set(id, bp);
+							bps.push(bp);
+						});
+						resolve();
+					} else {
+						vscode.window.showErrorMessage(`Cannot set breakpoint at ${filename}:${line}`);
+						reject();
+					}
+				});
+			});
 		};
-		request(options, (_, res, body) => {
-			if (res.statusCode === 200) {
-				bp.valid = true;
-				this.sendEvent('breakpointValidated', bp);
-				var id = Number.parseInt(body);
-				this._breakPoints.set(id, bp);
-				this.sendBreakpoint(id);
-			} else {
-				return vscode.window.showErrorMessage(`Cannot set breakpoint at ${filename}:${line}`);
-			}
-		});
 
-		return bp;
+		let url = `http://${this._runtimeIP}:${this._runtimePort}/breakpoint/${filename}:${line}:${column}`;
+		await block_get(url);
+
+		return bps;
 	}
 
 	/*
@@ -329,18 +332,16 @@ export class KratosRuntime extends EventEmitter {
 		await this.sendRemoveBreakpoints(filename);
 	}
 
-	public getBreakpoints(filename: string, line: number, fn: (id: number) => void) {
-		var payload = { filename: filename, line_num: line };
-		var url = `http://${this._runtimeIP}:${this._runtimePort}/breakpoint`;
-		var options = {
-			method: "get",
-			body: payload,
-			json: true,
-			url: url
-		};
-		request(options, (_, res, body) => {
+	public getBreakpoints(filename: string, line: number, fn: (id: Array<number>) => void) {
+		var url = `http://${this._runtimeIP}:${this._runtimePort}/breakpoint/${filename}:${line}`;
+		request.get(url, (_, res, body) => {
 			if (res.statusCode === 200) {
-				fn(0);
+				const bps = JSON.parse(body);
+				let cols = new Array<number>();
+				bps.forEach(bp => {
+					cols.push(bp.col);
+				});
+				fn(cols);
 			}
 		});
 	}
@@ -471,12 +472,12 @@ export class KratosRuntime extends EventEmitter {
 		request.delete(url);
 	}
 
-	// private methods
-
-	private sendBreakpoint(break_id: number) {
-		var url = `http://${this._runtimeIP}:${this._runtimePort}/breakpoint${break_id}`;
-		request.post(url);
+	public sendBreakpoint(break_id: number) {
+		var url = `http://${this._runtimeIP}:${this._runtimePort}/breakpoint/${break_id}`;
+		//request.post(url);
 	}
+
+	// private methods
 
 	private sendRemoveBreakpoint(filename: string, line_num: Number) {
 		var payload = { filename: filename, line_num: line_num };

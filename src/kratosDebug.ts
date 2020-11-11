@@ -71,7 +71,7 @@ export class KratosDebugSession extends LoggingDebugSession {
 
 		// this debugger uses 1-based lines and columns
 		this.setDebuggerLinesStartAt1(true);
-		this.setDebuggerColumnsStartAt1(false);
+		this.setDebuggerColumnsStartAt1(true);
 
 		this._runtime = new KratosRuntime();
 
@@ -105,7 +105,7 @@ export class KratosDebugSession extends LoggingDebugSession {
 			this.sendEvent(new StoppedEvent('exception', 0));
 		});
 		this._runtime.on('breakpointValidated', (bp: KratosBreakpoint) => {
-			this.sendEvent(new BreakpointEvent('changed', <DebugProtocol.Breakpoint>{ verified: bp.valid, id: bp.id }));
+			this.sendEvent(new BreakpointEvent('changed', <DebugProtocol.Breakpoint>{ verified: bp.valid, id: bp.id, column: bp.column }));
 		});
 		this._runtime.on('output', (text, filePath, line, column) => {
 			const e: DebugProtocol.OutputEvent = new OutputEvent(`${text}\n`);
@@ -205,19 +205,37 @@ export class KratosDebugSession extends LoggingDebugSession {
 		const breakpoints = args.breakpoints || [];
 
 		// clear all breakpoints for this file
+		// It's a command practice to do so (chrome-dev-core does that as well)
 		await this._runtime.clearBreakpoints(path);
 
 		// set and verify breakpoint locations
-		const actualBreakpoints = breakpoints.map(l => {
-			const kratos_bp = this._runtime.setBreakPoint(path, this.convertClientLineToDebugger(l.line), l.condition);
-			const bp = <DebugProtocol.Breakpoint>new Breakpoint(kratos_bp.valid, this.convertDebuggerLineToClient(kratos_bp.line));
-			bp.id = kratos_bp.id;
-			return bp;
-		});
+		let breakpoints_result = new Array<DebugProtocol.Breakpoint>();
+
+		for (const bp_entry of breakpoints) {
+			const bps = await this._runtime.verifyBreakpoint(path, this.convertClientLineToDebugger(bp_entry.line),
+				bp_entry.column ? this.convertClientColumnToDebugger(bp_entry.column) : undefined, bp_entry.condition);
+			if (bps.length == 0) {
+				// invalid breakpoint
+				// use -1 for invalid bp id
+				const b = <DebugProtocol.Breakpoint>new Breakpoint(false, this.convertDebuggerLineToClient(bp_entry.line),
+					bp_entry.column ? this.convertClientColumnToDebugger(bp_entry.column) : undefined);
+				breakpoints_result.push(b);
+			} else {
+				bps.forEach(bp => {
+					const b = <DebugProtocol.Breakpoint>new Breakpoint(bp.valid, this.convertDebuggerLineToClient(bp.line),
+						bp.column > 0 ? this.convertDebuggerColumnToClient(bp.column) : undefined);
+					b.id = bp.id;
+
+					this._runtime.sendBreakpoint(bp.id);
+					breakpoints_result.push(b);
+				})
+			}
+
+		}
 
 		// send back the actual breakpoint positions
 		response.body = {
-			breakpoints: actualBreakpoints
+			breakpoints: breakpoints_result
 		};
 		this.sendResponse(response);
 	}
@@ -225,12 +243,16 @@ export class KratosDebugSession extends LoggingDebugSession {
 	protected breakpointLocationsRequest(response: DebugProtocol.BreakpointLocationsResponse, args: DebugProtocol.BreakpointLocationsArguments, request?: DebugProtocol.Request): void {
 
 		if (args.source.path) {
-			this._runtime.getBreakpoints(args.source.path, this.convertClientLineToDebugger(args.line), (col) => {
-				response.body = {
-					breakpoints: [{
+			this._runtime.getBreakpoints(args.source.path, this.convertClientLineToDebugger(args.line), (cols) => {
+				let bps = new Array<DebugProtocol.BreakpointLocation>();
+				cols.forEach(col => {
+					bps.push({
 						line: args.line,
 						column: this.convertDebuggerColumnToClient(col)
-					}]
+					})
+				});
+				response.body = {
+					breakpoints: bps
 				};
 				this.sendResponse(response);
 			});
@@ -364,8 +386,8 @@ export class KratosDebugSession extends LoggingDebugSession {
 
 		} else {
 			// we run a query to figure out any lower level
-			const instance_vars = is_generator? this._runtime.getCurrentGeneratorVariables().get(instance_id):
-							this._runtime.getCurrentLocalVariables().get(instance_id);
+			const instance_vars = is_generator ? this._runtime.getCurrentGeneratorVariables().get(instance_id) :
+				this._runtime.getCurrentLocalVariables().get(instance_id);
 			if (instance_vars) {
 				const vars = instance_vars[stack_id];
 				// we will include the dot here
@@ -379,7 +401,7 @@ export class KratosDebugSession extends LoggingDebugSession {
 							let next_name = name_tokens[0];
 							if (!handles.has(next_name)) {
 								let handle_name = id_name + next_name;
-								let suffix = is_generator? "generator": "local";
+								let suffix = is_generator ? "generator" : "local";
 								const ref = this._variableHandles.create(`${handle_name}-${instance_id}-${stack_id}-${suffix}`);
 								let value = "Object";
 								let is_array = false;
@@ -431,14 +453,14 @@ export class KratosDebugSession extends LoggingDebugSession {
 	}
 
 	private processNestedScope(name: string, handles: Set<string>, instance_id: number, stack_id: number,
-		                       variables: DebugProtocol.Variable[], value: string, isGenerator: Boolean) {
+		variables: DebugProtocol.Variable[], value: string, isGenerator: Boolean) {
 		if (name.includes(".")) {
 			// only create handle for the first level
 			// we will handle them recursively
 			let name_tokens = name.split(".");
 			let handle_name = name_tokens[0];
 			let next_name = name_tokens[1];
-			let suffix = isGenerator? "generator": "local";
+			let suffix = isGenerator ? "generator" : "local";
 			if (!handles.has(handle_name)) {
 				const ref = this._variableHandles.create(`${handle_name}-${instance_id}-${stack_id}-${suffix}`);
 				let value = "Object";
