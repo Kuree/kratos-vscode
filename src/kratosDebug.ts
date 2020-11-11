@@ -208,6 +208,8 @@ export class KratosDebugSession extends LoggingDebugSession {
 		// It's a command practice to do so (chrome-dev-core does that as well)
 		await this._runtime.clearBreakpoints(path);
 
+		let inserted_breakpoints = new Set<string>();
+
 		// set and verify breakpoint locations
 		let breakpoints_result = new Array<DebugProtocol.Breakpoint>();
 
@@ -221,14 +223,21 @@ export class KratosDebugSession extends LoggingDebugSession {
 					bp_entry.column ? this.convertClientColumnToDebugger(bp_entry.column) : undefined);
 				breakpoints_result.push(b);
 			} else {
-				bps.forEach(bp => {
-					const b = <DebugProtocol.Breakpoint>new Breakpoint(bp.valid, this.convertDebuggerLineToClient(bp.line),
-						bp.column > 0 ? this.convertDebuggerColumnToClient(bp.column) : undefined);
-					b.id = bp.id;
+				// we only need to create new breakpoint if we haven't created it yet at the same location
+				for (const bp of bps) {
+					const key = `${path}:${bp.line}:${bp.column}`;
+					if (!inserted_breakpoints.has(key)) {
+						const b = <DebugProtocol.Breakpoint>new Breakpoint(bp.valid, this.convertDebuggerLineToClient(bp.line),
+							bp.column > 0 ? this.convertDebuggerColumnToClient(bp.column) : undefined);
+						b.id = bp.id;
 
-					this._runtime.sendBreakpoint(bp.id);
-					breakpoints_result.push(b);
-				})
+						breakpoints_result.push(b);
+
+						// put it into the set
+						inserted_breakpoints.add(key);
+					}
+					this._runtime.sendBreakpoint(bp.id, bp_entry.condition);
+				}
 			}
 
 		}

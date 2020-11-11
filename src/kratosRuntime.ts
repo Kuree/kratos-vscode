@@ -472,9 +472,16 @@ export class KratosRuntime extends EventEmitter {
 		request.delete(url);
 	}
 
-	public sendBreakpoint(break_id: number) {
-		var url = `http://${this._runtimeIP}:${this._runtimePort}/breakpoint/${break_id}`;
-		//request.post(url);
+	public sendBreakpoint(breakpoint_id: number, expr?: string) {
+		let url = `http://${this._runtimeIP}:${this._runtimePort}/breakpoint`;
+		let payload = { id: breakpoint_id, expr: expr || "" };
+		let options = {
+			method: "post",
+			body: payload,
+			json: true,
+			url: url
+		};
+		request(options);
 	}
 
 	// private methods
@@ -528,7 +535,7 @@ export class KratosRuntime extends EventEmitter {
 			url: url
 		};
 		request(options, (_, res, __) => {
-			if (res.statusCode !== 200) {
+			if (!res || res.statusCode !== 200) {
 				vscode.window.showErrorMessage("Failed to connect to a running simulator");
 			} else {
 				this._connected = true;
